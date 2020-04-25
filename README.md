@@ -1,7 +1,8 @@
 # MFIR-AP
 TODO:
 - [ ] Setup HTPA32x32d << setup.sh
-- [ ] Overall architecture
+- [x] Overall architecture
+	- CNN + LSTM (make it modular!)
 - [ ] Metrics
   - [ ] LR 
   - [ ] Implementation
