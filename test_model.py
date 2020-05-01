@@ -40,8 +40,27 @@ class Test_build_classifier(unittest.TestCase):
         result = tf.cast(classifier(np.empty(BATCH_SHAPE)), dtype=np.float32)
         self.assertEqual(result.shape, (BATCH_SIZE, FRAMES, model.N_CLASSES))
 
+    def test_compile_classifier(self):
+        data = np.random.rand(np.prod(BATCH_SHAPE)).astype(np.float32).reshape(BATCH_SHAPE)
+        y_true = ((np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES]) > 0.5) * 1)
+        classifier = model.build_classifier()
+        self.assertTrue(classifier)
+        result = tf.cast(classifier(np.empty(BATCH_SHAPE)), dtype=np.float32)
+        classifier.compile(loss='categorical_crossentropy', optimizer="adam", metrics=['accuracy'])
+        classifier.fit(data, y_true)
+        tf.keras.backend.clear_session()
+        
 class Test_exponential_loss(unittest.TestCase):
     def test_loss(self):
-y_true = ((np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES]) > 0.5) * 1)
-y_pred = np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES])
+        y_true = ((np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES]) > 0.5) * 1)
+        y_pred = np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES])
         model.exponential_loss(y_true, y_pred)
+
+    def test_training(self):
+        data = np.random.rand(np.prod(BATCH_SHAPE)).astype(np.float32).reshape(BATCH_SHAPE)
+        y_true = ((np.random.rand(BATCH_SIZE * FRAMES).reshape([BATCH_SIZE, FRAMES]) > 0.5) * 1)
+        classifier = model.build_classifier()
+        self.assertTrue(classifier)
+        classifier.compile(loss=model.exponential_loss, optimizer="adam", metrics=['accuracy'])
+        classifier.fit(data, y_true)
+        tf.keras.backend.clear_session()

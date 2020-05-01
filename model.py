@@ -4,6 +4,8 @@ from tensorflow.keras.layers import Input, TimeDistributed, Activation
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
 from tensorflow.keras.layers import GRU as RNN
 
+import numpy as np
+
 
 EMBEDDING_UNITS = 1024
 RNN_UNITS = EMBEDDING_UNITS
@@ -11,6 +13,8 @@ N_CLASSES = 1
 
 KERAS_EPSILON = tf.keras.backend.epsilon()
 EPSILON = KERAS_EPSILON
+
+FLOATX='float32'
 
 def build_embedding():
     # sequential
@@ -77,7 +81,7 @@ def exponential_loss(y_true, y_pred, from_logits=False):
     # https://stackoverflow.com/questions/39192380/tensorflow-one-class-classification
     # https://github.com/keras-team/keras/blob/7a39b6c62d43c25472b2c2476bd2a8983ae4f682/keras/backend/cntk_backend.py#L1065
     if not tf.is_tensor(y_pred):
-        y_pred = tf.constant(y_pred)
+        y_pred = tf.constant(y_pred, dtype=FLOATX)
     y_true = tf.cast(y_true, y_pred.dtype)
     if from_logits:
         y_pred = tf.keras.activations.sigmoid(y_pred)
@@ -85,8 +89,10 @@ def exponential_loss(y_true, y_pred, from_logits=False):
     log_pos = (y_true)*tf.math.log(y_pred)
     log_neg = (1.0 - y_true)*tf.math.log(1.0 - y_pred)
     # ONLY IF ACTION HAPPENS AT THE LAST FRAME
-    Y = y_true.shape[-1]
-    positive_loss = -tf.reduce_sum(tf.broadcast_to(tf.math.exp(-(Y-tf.range(Y)-1)/20), log_pos.shape) * log_pos)
+    Y = tf.shape(y_true)[-1]
+    [print("") for i in range(10)]
+    arg=tf.cast(tf.math.exp(-(Y-tf.range(Y)-1)/20), FLOATX)
+    positive_loss = -tf.reduce_sum(tf.broadcast_to(tf.math.exp(arg), tf.shape(log_pos)) * log_pos)
     negative_loss = -tf.reduce_sum(log_neg)
     total_loss = positive_loss + negative_loss
     return total_loss
