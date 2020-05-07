@@ -1,18 +1,3 @@
-# MFIR-AP
-TODO:
-- [ ] Setup HTPA32x32d << setup.sh
-- [x] Overall architecture
-	- CNN + LSTM (make it modular!)
-- [ ] Metrics
-  - [ ] LR 
-  - [ ] Implementation
-- [ ] Training
-  - [ ] MFIR Dataset loader
-  - [ ] MFIR Dataset generators 
-
-
-Structure: https://medium.com/swlh/how-to-structure-a-python-based-data-science-project-a-short-tutorial-for-beginners-7e00bff14f56
-
 ├── README.md          <- The top-level README for developers.
 ├── conf               <- Space for credentials
 │
