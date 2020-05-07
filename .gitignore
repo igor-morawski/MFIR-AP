@@ -127,5 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-HTPA32x32d
-HTPA32x32d/*
+data/01_raw/*/
+data/02_intermediate/*/
