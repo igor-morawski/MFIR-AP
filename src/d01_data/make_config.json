@@ -1,0 +1,1 @@
+{"dataset_destination_dir": "/media/igor/DATA/PIPELINE/20200508_aligned_labeled", "view_IDs": ["121", "122", "123"], "processed_input_dir": "/media/igor/DATA/PIPELINE/20200508_aligned", "labels_filepath": "/media/igor/DATA/PIPELINE/20200508_aligned/labels.json", "tpas_extension": "TXT", "MAKE": 1, "PREPARE": 0}

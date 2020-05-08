@@ -1,0 +1,1 @@
+{"raw_input_dir": "/media/igor/DATA/PIPELINE/20200508", "processed_destination_dir": "/media/igor/DATA/PIPELINE/20200508_aligned", "view_IDs": ["121", "122", "123"], "tpas_extension": "TXT", "MAKE": 0, "PREPARE": 1, "VISUALIZE": 0, "UNDISTORT": 1, "calib_fp": "calib.pkl"}
