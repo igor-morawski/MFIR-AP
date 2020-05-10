@@ -1,0 +1,1 @@
+sudo rm -r HTPA32x32d; cp -r ~/Desktop/Projects/HTPA32x32d/HTPA32x32d . ;python3 convert.py $1; sudo rm -r HTPA32x32d; 
