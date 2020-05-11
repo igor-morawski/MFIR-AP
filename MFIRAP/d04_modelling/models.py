@@ -1,0 +1,101 @@
+import tensorflow as tf
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Input, TimeDistributed, Activation
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
+from tensorflow.keras.layers import Concatenate
+from tensorflow.keras.layers import GRU as RNN
+
+import matplotlib.pyplot as plt
+
+import MFIRAP.d00_utils.verbosity as vb
+import MFIRAP.d00_utils.paths as paths
+
+import MFIRAP.d00_utils.project as project
+
+
+FLOATX='float32'
+tf.keras.backend.set_image_data_format('channels_last')
+
+import numpy as np
+
+def _build_TPA_embedding(view_id, dense_units):
+    # VGG-16 but dims are scaled by 1/7, only 3 blocks
+    # FUTURE Think about filters -> skipping cncnts
+    # https://towardsdatascience.com/step-by-step-vgg16-implementation-in-keras-for-beginners-a833c686ae6c
+    # b=block c=conv m=maxpool
+    # input>b1c1>b1c2>b1c3>b2m1>b2c1>b2c2>b2c3>b3m1>flatten>fc
+    embedding_input = Input(shape=(None, *project.TPA_FRAME_SHAPE), name='TPA{}_input'.format(view_id))
+    # block1
+    b1c1 = TimeDistributed(Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b1c1'.format(view_id))(embedding_input)
+    b1c2 = TimeDistributed(Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b1c2'.format(view_id))(b1c1)
+    b1c3 = TimeDistributed(Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b1c3'.format(view_id))(b1c2)
+    # block2
+    b2m1 = TimeDistributed(MaxPool2D(pool_size=(2, 2), strides=(2, 2)), name='TPA{}_b2m1'.format(view_id))(b1c3)
+    b2c1 = TimeDistributed(Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b2c1'.format(view_id))(b2m1)
+    b2c2 = TimeDistributed(Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b2c2'.format(view_id))(b2c1)
+    b2c3 = TimeDistributed(Conv2D(filters=128, kernel_size=(3, 3), padding="same", activation="relu"), name='TPA{}_b2c3'.format(view_id))(b2c2)
+    # block3
+    b3m1 = TimeDistributed(MaxPool2D(pool_size=(2, 2), strides=(2, 2)), name='TPA{}_b3m1'.format(view_id))(b2c3)
+    # FC
+    flat = TimeDistributed(Flatten(), name='TPA{}_flat'.format(view_id))(b3m1)
+    dense = TimeDistributed(Dense(units=dense_units, activation="relu"), name='TPA{}_dense'.format(view_id))(flat) # flatten/fc = 6.125
+    embedding_output = dense
+    return embedding_input, embedding_output
+
+class Models_Training():
+    def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs):
+        self.model = model
+        self.fit_kwargs = fit_kwargs
+        self.compile_kwargs = compile_kwargs
+        self.TPA_view_IDs = TPA_view_IDs
+        self.name=name
+        paths.ensure_path_exists(project.DATA_MODELS_PATH)
+        paths.ensure_path_exists(project.DATA_MODELS_OUTPUT_PATH)
+        self.trained = False
+
+    def compile(self):
+        self.model.compile(**self.compile_kwargs)
+    
+    def fit(self):
+        self.model.fit(**self.fit_kwargs)
+        self.trained = True
+
+    @property
+    def history(self):
+        return self.model.history.history
+    
+    def plot_loss(self):
+        if not self.trained:
+            raise Exception("Train the model first!")
+        self._plot(self.history["loss"], "loss", "epoch")
+        plt.savefig(project.DATA_MODELS_PATH, "loss.png")
+
+    def _plot(self, x, x_label, y_label, title=None):
+        if not title:
+            title = 'Model {}'.format(x_label)
+        plt.clf
+        plt.plot(x)
+        plt.title(title)
+        plt.ylabel(''.format(x_label))
+        plt.xlabel(''.format(y_label))
+        plt.clf
+
+
+class Baseline1(Models_Training):
+    '''
+    TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
+    '''
+    def __init__(self, fit_kwargs, compile_kwargs, name = 'baseline1', TPA_view_IDs = ["121", "122", "123"], TPA_dense_units = 1024//3):
+        vb.print_general("Initializing Baseline1...")
+
+        io_TPAs = [_build_TPA_embedding(id, TPA_dense_units) for id in TPA_view_IDs]
+        i_TPAs = [x[0] for x in io_TPAs]
+        o_TPAs = [x[1] for x in io_TPAs]
+
+        TPA_merged = Concatenate(name='view_concat', axis=-1)([*o_TPAs])
+        rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
+        TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
+        TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
+        model = Model(i_TPAs, TPA_classification, name="Model_3xTPA")
+
+        Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)

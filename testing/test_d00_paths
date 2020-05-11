@@ -1,4 +1,0 @@
-import unittest
-import MFIRAP.utils.paths as tested_module
-
-# functions are trivial, testing if import is succsesful is enough

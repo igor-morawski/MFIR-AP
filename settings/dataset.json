@@ -1,0 +1,16 @@
+{
+    "_comment": "THIS FILE SHOULD REMAIN UNCHANGED",
+    "view_IDs": [
+        "121",
+        "122",
+        "123"
+    ],
+    "RGB": 1,
+    "development_subjects": [
+        "subject1",
+        "subject2"
+    ],
+    "test_subjects": [
+        "subjectTEST"
+    ]
+}
