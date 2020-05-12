@@ -23,7 +23,7 @@ from MFIRAP.d04_modelling.models import Baseline1
 from MFIRAP.d04_modelling.losses import Losses_Keras
 from MFIRAP.d03_processing.batch_processing import intermediate2processed
 from MFIRAP.d04_modelling.training import Train_Validation_Generators, Timestamper_counted_down
-from MFIRAP.d04_modelling.metrics import Metrics_Keras
+from MFIRAP.d04_modelling.metrics import Metrics_Keras, AUC_AP, Precision_AP, Recall_AP, PrecisionAtRecall_AP
 from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
 
 if __name__ == "__main__":
@@ -73,7 +73,8 @@ if __name__ == "__main__":
     metrics = Metrics_Keras(model_config["frames"], model_config["frame_shift"], train_timestamps_cd)
     atta_fnc = metrics.get_average_time_to_accident()
     # 
-    compile_kwargs = {"loss":loss_fnc, "optimizer":"adam", "metrics":[tf.keras.metrics.AUC()]+[atta_fnc]}
+    ap_metrics = [AUC_AP(), Precision_AP(), Recall_AP(), PrecisionAtRecall_AP(0.8)]
+    compile_kwargs = {"loss":loss_fnc, "optimizer":"adam", "metrics":ap_metrics+[atta_fnc]}
     fit_kwargs = {"x":train_generator, "epochs":model_config['epochs'], "validation_data":valid_generator, "callbacks":timestampers}
     baseline1 = Baseline1(name= model_config['name'], compile_kwargs=compile_kwargs, fit_kwargs=fit_kwargs, TPA_view_IDs=model_config['view_IDs'])
     vb.print_specific(baseline1.model.summary())

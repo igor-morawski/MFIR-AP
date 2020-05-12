@@ -5,7 +5,6 @@ from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
 from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import GRU as RNN
 from tensorflow.keras.models import model_from_json
-
 import matplotlib.pyplot as plt
 import glob
 import os
