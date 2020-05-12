@@ -6,11 +6,14 @@ from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import GRU as RNN
 
 import matplotlib.pyplot as plt
+import glob
+import os
 
 import MFIRAP.d00_utils.verbosity as vb
 import MFIRAP.d00_utils.paths as paths
 
 import MFIRAP.d00_utils.project as project
+
 
 
 FLOATX='float32'
@@ -49,8 +52,12 @@ class Models_Training():
         self.compile_kwargs = compile_kwargs
         self.TPA_view_IDs = TPA_view_IDs
         self.name=name
-        paths.ensure_path_exists(project.DATA_MODELS_PATH)
-        paths.ensure_path_exists(project.DATA_MODELS_OUTPUT_PATH)
+        self.data_models_model_path = os.path.join(project.DATA_MODELS_PATH, self.name)
+        self.data_models_output_model_path = os.path.join(project.DATA_MODELS_OUTPUT_PATH, self.name)
+        self.data_model_plot_path = os.path.join(project.DATA_MODELS_OUTPUT_PATH, self.name, "plots")
+        paths.ensure_path_exists(self.data_models_model_path)
+        paths.ensure_path_exists(self.data_models_output_model_path)
+        paths.ensure_path_exists(self.data_model_plot_path)
         self.trained = False
 
     def compile(self):
@@ -64,21 +71,42 @@ class Models_Training():
     def history(self):
         return self.model.history.history
     
-    def plot_loss(self):
+    def plot_metrics(self, plot_val_metrics=False):
         if not self.trained:
             raise Exception("Train the model first!")
-        self._plot(self.history["loss"], "loss", "epoch")
-        plt.savefig(project.DATA_MODELS_PATH, "loss.png")
+        for metric in self.history:
+            if not plot_val_metrics:
+                if "val_" in metric:
+                    continue
+            self._plot(self.history[metric], metric, "epoch")
+            plt.savefig(os.path.join(self.data_model_plot_path, metric+".png"))
+        return
 
     def _plot(self, x, x_label, y_label, title=None):
         if not title:
             title = 'Model {}'.format(x_label)
-        plt.clf
+        plt.clf()
         plt.plot(x)
         plt.title(title)
         plt.ylabel(''.format(x_label))
         plt.xlabel(''.format(y_label))
-        plt.clf
+
+    def delete_existing_model_data_and_output(self):
+        '''
+        Use carefully
+        Clears model files including reporting files such as plots associated with model's name in self.name
+        '''
+        dirs = [self.data_models_model_path, self.data_models_output_model_path, self.data_model_plot_path]
+        [print(f) for f in [glob.glob(p) for p in [os.path.join(d, "*.*") for d in dirs]]]
+    
+    def delete_existing_plots(self):
+        '''
+        Use carefully
+        Clears all plots associated with model's name in self.name
+        '''
+        dirs = [self.data_model_plot_path]
+        [print(f) for f in [glob.glob(p) for p in [os.path.join(d, "*.png") for d in dirs]]]
+        
 
 
 class Baseline1(Models_Training):
@@ -99,3 +127,97 @@ class Baseline1(Models_Training):
         model = Model(i_TPAs, TPA_classification, name="Model_3xTPA")
 
         Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
+
+
+'''
+
+class Models_Training():
+    def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs):
+        self.model = model
+        self.fit_kwargs = fit_kwargs
+        self.compile_kwargs = compile_kwargs
+        self.TPA_view_IDs = TPA_view_IDs
+        self.name=name
+        self.data_models_model_path = os.path.join(project.DATA_MODELS_PATH, self.name)
+        self.data_models_output_model_path = os.path.join(project.DATA_MODELS_OUTPUT_PATH, self.name)
+        paths.ensure_path_exists(self.data_models_model_path)
+        paths.ensure_path_exists(self.data_models_output_model_path)
+        self.trained = False
+        self._history = None
+        try: 
+            self.verbose = fit_kwargs["verbose"]
+        except: 
+            self.verbose = 1
+
+    def compile(self):
+        self.model.compile(**self.compile_kwargs)
+    
+    def fit(self):
+        fit_kwargs = self.fit_kwargs.copy()
+        valid_kwargs = self.fit_kwargs.copy()
+        try:
+            fit_kwargs["validation_data"] = None
+            valid_kwargs["x"] = valid_kwargs["validation_data"]
+            valid_kwargs.pop("validation_data")
+        except KeyError:
+            fit_kwargs["validation_data"] = None
+            valid_kwargs["x"] = None
+            vb.print_general("No validation data.")
+        try: 
+            epochs = fit_kwargs["epochs"]
+            fit_kwargs.pop("epochs")
+            valid_kwargs.pop("epochs")
+        except KeyError:
+            epochs = 1
+        for epoch in range(epochs):
+            if self.verbose:
+                print("Epoch {}/{}: training...".format(epoch, epochs))
+            history = self.model.fit(**fit_kwargs)
+            self._update_history(history)
+            if valid_kwargs["x"]:
+                if self.verbose:
+                    print("Epoch {}/{}: validation...".format(epoch, epochs))
+                valid_history = self.model.evaluate(**valid_kwargs)
+                self._update_valid_history(valid_history)
+        self.trained = True
+        return
+        self.model.fit(**self.fit_kwargs)
+        self.trained = True
+
+    @property
+    def history(self):
+        return self._history
+        #return self.model.history.history
+
+    def _update_history(self, history_step):
+        if not self._history:
+            self._history = history_step.history
+        for key in history_step.history:
+            self._history[key] = self._history[key] + history_step.history[key]
+
+    def _update_valid_history(self, valid_history_step):
+        # no if not self._history here, self._history is assumed to be always handled
+        # by _update_history during trainiing first, if this doesn't hold anymore modify here
+        for key, value in zip(self.model.metrics_names, valid_history_step):
+            valid_key = "valid_"+key
+            try:
+                self._history[valid_key] = self._history[valid_key] + [value]
+            except KeyError:
+                self._history[valid_key] = [value]
+
+    def plot_loss(self):
+        if not self.trained:
+            raise Exception("Train the model first!")
+        self._plot(self.history["loss"], "loss", "epoch")
+        plt.savefig(os.path.join(self.data_models_model_path, "loss.png"))
+
+    def _plot(self, x, x_label, y_label, title=None):
+        if not title:
+            title = 'Model {}'.format(x_label)
+        plt.clf
+        plt.plot(x)
+        plt.title(title)
+        plt.ylabel(''.format(x_label))
+        plt.xlabel(''.format(y_label))
+        plt.clf
+'''

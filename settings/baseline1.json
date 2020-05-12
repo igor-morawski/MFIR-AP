@@ -5,8 +5,8 @@
     "frame_shift":0,
     "dataset_processed_parent_path" : "/home/igor/Desktop/Projects/MFIR-AP/data/03_processed", 
     "loss_function" : "exponential_loss",
-    "train_size" : 0.8,
-    "batch_size" : 8,
+    "train_size" : 0.5,
+    "batch_size" : 2,
     "rgb" : 0,
     "view_IDs" : ["121", "122", "123"],
     "epochs" : 5
