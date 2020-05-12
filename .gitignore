@@ -130,3 +130,5 @@ dmypy.json
 data/01_raw/*/
 data/02_intermediate/*/
 data/03_processed/*/
+data/04_models/*/
+data/05_models_output/*/
