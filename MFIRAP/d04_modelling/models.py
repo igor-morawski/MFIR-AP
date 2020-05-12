@@ -4,6 +4,7 @@ from tensorflow.keras.layers import Input, TimeDistributed, Activation
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
 from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import GRU as RNN
+from tensorflow.keras.models import model_from_json
 
 import matplotlib.pyplot as plt
 import glob
@@ -59,6 +60,7 @@ class Models_Training():
         paths.ensure_path_exists(self.data_models_output_model_path)
         paths.ensure_path_exists(self.data_model_plot_path)
         self.trained = False
+        self.saved = False
 
     def compile(self):
         self.model.compile(**self.compile_kwargs)
@@ -66,6 +68,16 @@ class Models_Training():
     def fit(self):
         self.model.fit(**self.fit_kwargs)
         self.trained = True
+
+    def save(self):
+        if not self.trained:
+            raise Exception("Train the model first!")
+        model_json = self.model.to_json()
+        with open(os.path.join(self.data_models_model_path, self.name+".json"), "w") as json_file:
+            json_file.write(model_json)
+        self.model.save_weights(os.path.join(self.data_models_model_path, self.name+".h5"))
+        tf.keras.utils.plot_model(self.model, os.path.join(self.data_models_model_path, self.name+".png"))
+        self.saved = True
 
     @property
     def history(self):
@@ -97,7 +109,7 @@ class Models_Training():
         Clears model files including reporting files such as plots associated with model's name in self.name
         '''
         dirs = [self.data_models_model_path, self.data_models_output_model_path, self.data_model_plot_path]
-        [print(f) for f in [glob.glob(p) for p in [os.path.join(d, "*.*") for d in dirs]]]
+        [[os.remove(f) for f in fl] for fl in [glob.glob(p) for p in [os.path.join(d, "*.*") for d in dirs]]]
     
     def delete_existing_plots(self):
         '''
@@ -105,7 +117,7 @@ class Models_Training():
         Clears all plots associated with model's name in self.name
         '''
         dirs = [self.data_model_plot_path]
-        [print(f) for f in [glob.glob(p) for p in [os.path.join(d, "*.png") for d in dirs]]]
+        [[os.remove(f) for f in fl] for fl in [glob.glob(p) for p in [os.path.join(d, "*.png") for d in dirs]]]
         
 
 
@@ -113,14 +125,18 @@ class Baseline1(Models_Training):
     '''
     TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
     '''
-    def __init__(self, fit_kwargs, compile_kwargs, name = 'baseline1', TPA_view_IDs = ["121", "122", "123"], TPA_dense_units = 1024//3):
+    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units = 1024//3):
         vb.print_general("Initializing Baseline1...")
 
         io_TPAs = [_build_TPA_embedding(id, TPA_dense_units) for id in TPA_view_IDs]
         i_TPAs = [x[0] for x in io_TPAs]
         o_TPAs = [x[1] for x in io_TPAs]
 
-        TPA_merged = Concatenate(name='view_concat', axis=-1)([*o_TPAs])
+        if len(TPA_view_IDs) > 1:
+            TPA_merged = Concatenate(name='view_concat', axis=-1)([*o_TPAs])
+        if len(TPA_view_IDs) == 1:
+            TPA_merged = [*o_TPAs]
+        
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
         TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
         TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
