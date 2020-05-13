@@ -60,7 +60,7 @@ class Train_Validation_Generators:
     
     def get_valid(self):
         return Data_generator(self.valid_pos_samples, self.valid_neg_samples, view_IDs = self.view_IDs, batch_size = self.batch_size, shuffle = self.shuffle, RGB = self.RGB)
-        
+    
 class Data_generator(tf.keras.utils.Sequence):
     def __init__(self, pos_samples, neg_samples, view_IDs, batch_size=32, shuffle=True, RGB=False):
         self.pos_samples = pos_samples.copy()

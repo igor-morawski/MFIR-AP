@@ -14,8 +14,6 @@ import MFIRAP.d00_utils.paths as paths
 
 import MFIRAP.d00_utils.project as project
 
-
-
 FLOATX='float32'
 tf.keras.backend.set_image_data_format('channels_last')
 
@@ -118,8 +116,6 @@ class Models_Training():
         dirs = [self.data_model_plot_path]
         [[os.remove(f) for f in fl] for fl in [glob.glob(p) for p in [os.path.join(d, "*.png") for d in dirs]]]
         
-
-
 class Baseline1(Models_Training):
     '''
     TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
@@ -142,6 +138,14 @@ class Baseline1(Models_Training):
         model = Model(i_TPAs, TPA_classification, name="Model_3xTPA")
 
         Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
+
+
+
+
+
+
+SETUP_DIC = {"baseline1":Baseline1}
+SETUP_RGB_FLAGS = {"baseline1":False}
 
 
 '''

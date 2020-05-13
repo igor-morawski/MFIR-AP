@@ -7,7 +7,7 @@
     "loss_function" : "exponential_loss",
     "train_size" : 0.5,
     "batch_size" : 2,
-    "rgb" : 0,
     "view_IDs" : ["121", "122", "123"],
-    "epochs" : 5
+    "epochs" : 5,
+    "setup" : "baseline1"
 }
