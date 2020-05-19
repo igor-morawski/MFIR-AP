@@ -20,10 +20,10 @@ import datetime
 
 from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
 from MFIRAP.d03_processing.batch_processing import intermediate2processed
-from MFIRAP.d04_modelling.losses import Losses_Keras
+from MFIRAP.d04_modelling.losses import Losses_Keras, zero_loss
 from MFIRAP.d04_modelling.training import Train_Validation_Generators, Timestamper_counted_down
 from MFIRAP.d04_modelling.metrics import Metrics_Keras, AUC_AP, Precision_AP, Recall_AP, PrecisionAtRecall_AP
-from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS
+from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS, RGB_FEATURES_LAYER_NAME
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -63,29 +63,46 @@ if __name__ == "__main__":
     if not len(valid_generator):
         valid_generator = None
     vb.print_specific("Loss function: {}".format(model_config['loss_function']))
-    losses = Losses_Keras(frames=model_config['frames'], frame_shift=model_config['frame_shift'])
-    loss_fnc = losses.get_by_name(model_config['loss_function'], from_logits=False)
-    
     # 3.
     # set up atta
     #never forget that! cd = counted_down
     train_timestamps_cd = K.variable(train_generator._get_batch_timestamps(0))
     train_timestamper = Timestamper_counted_down(train_timestamps_cd, trainining_generator=train_generator)
     timestampers = [train_timestamper]
-    # settting up atta
+    # settting up atta and other metrics
     metrics = Metrics_Keras(model_config["frames"], model_config["frame_shift"], train_timestamps_cd)
     atta_fnc = metrics.get_average_time_to_accident()
-    # 
     ap_metrics = [AUC_AP(), Precision_AP(), Recall_AP(), PrecisionAtRecall_AP(0.8)]
-    compile_kwargs = {"loss":loss_fnc, "optimizer":"adam", "metrics":ap_metrics+[atta_fnc]}
-    fit_kwargs = {"x":train_generator, "epochs":model_config['epochs'], "validation_data":valid_generator, "callbacks":timestampers}
-    setup = Setup(name= config_json_name, compile_kwargs=compile_kwargs, fit_kwargs=fit_kwargs, TPA_view_IDs=model_config['view_IDs'])
+    losses = Losses_Keras(frames=model_config['frames'], frame_shift=model_config['frame_shift'])
+    ##################
+    # FINAL SETTINGS #
+    ##################
+    metrics = ap_metrics+[atta_fnc]
+    callbacks = [] + timestampers
+    optimizer = "adam"
+    loss_fnc = losses.get_by_name(model_config['loss_function'], from_logits=False)
+    epochs = model_config['epochs']
+    if SETUP_RGB_FLAGS[model_config["setup"]]:
+        try:
+            model_config["pretraining_epochs"]
+        except KeyError:
+            raise Exception("Key {} not found in model configuration.".format("pretraining_epochs"))
+        pretraining_epochs = model_config['pretraining_epochs']
+    # if RGB pretraining
+    if SETUP_RGB_FLAGS[model_config["setup"]]:
+        precompile_kwargs = {"loss":[zero_loss, loss_fnc], "loss_weights":[0, 1], "optimizer":optimizer}
+        prefit_kwargs = {"x":train_generator, "epochs":epochs, "validation_data":valid_generator, "callbacks":callbacks}
+    else:
+        precompile_kwargs = None
+        prefit_kwargs = None
+    compile_kwargs = {"loss":loss_fnc, "optimizer":optimizer, "metrics":metrics}
+    fit_kwargs = {"x":train_generator, "epochs":epochs, "validation_data":valid_generator, "callbacks":callbacks}
+    setup = Setup(name= config_json_name, compile_kwargs=compile_kwargs, fit_kwargs=fit_kwargs, TPA_view_IDs=model_config['view_IDs'], pretraining = SETUP_RGB_FLAGS[model_config["setup"]], precompile_kwargs=precompile_kwargs, prefit_kwargs=prefit_kwargs)
     vb.print_specific(setup.model.summary())
     vb.print_specific("Compiling...")
-    setup.compile()
-    # 4. Train and save.
+    # 4. (Pretrain, ) train and save.
     setup.delete_existing_model_data_and_output()
-    setup.fit()
+    setup.train()
     setup.save()
     # 5. Report
     setup.plot_metrics(plot_val_metrics=valid_generator)

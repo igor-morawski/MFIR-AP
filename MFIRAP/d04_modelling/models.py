@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Input, TimeDistributed, Activation
+from tensorflow.keras.layers import Input, TimeDistributed, Activation, Lambda
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
-from tensorflow.keras.layers import Concatenate
+from tensorflow.keras.layers import Concatenate, Subtract, Multiply
 from tensorflow.keras.layers import GRU as RNN
 from tensorflow.keras.models import model_from_json
 import matplotlib.pyplot as plt
@@ -14,8 +14,13 @@ import MFIRAP.d00_utils.paths as paths
 
 import MFIRAP.d00_utils.project as project
 
+
+RGB_FEATURES_LAYER_NAME = "RGB_features"
+
 FLOATX='float32'
+TPA_DENSE_DEFAULT = 1024 //10
 tf.keras.backend.set_image_data_format('channels_last')
+
 
 import numpy as np
 
@@ -44,7 +49,7 @@ def _build_TPA_embedding(view_id, dense_units):
     return embedding_input, embedding_output
 
 class Models_Training():
-    def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs):
+    def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs, pretraining = False, precompile_kwargs = None, prefit_kwargs = None):
         self.model = model
         self.fit_kwargs = fit_kwargs
         self.compile_kwargs = compile_kwargs
@@ -56,13 +61,29 @@ class Models_Training():
         paths.ensure_path_exists(self.data_models_model_path)
         paths.ensure_path_exists(self.data_models_output_model_path)
         paths.ensure_path_exists(self.data_model_plot_path)
+        self.pretraining = pretraining
+        self.prefit_kwargs = prefit_kwargs
+        self.precompile_kwargs = precompile_kwargs
+        self.pretrained = False
         self.trained = False
         self.saved = False
+        if self.pretraining:
+            if not all([self.prefit_kwargs, self.precompile_kwargs]):
+                raise Exception("Pretraining requested but no args for compiling and/or fitting passed.")
 
-    def compile(self):
-        self.model.compile(**self.compile_kwargs)
     
-    def fit(self):
+    def train(self):
+        if self.pretraining:
+            vb.print_general("Pretraining...")
+            self.model.compile(**self.precompile_kwargs)
+            self.model.fit(**self.prefit_kwargs)
+            self.pretrained = True
+        if self.pretraining and not self.pretrained:
+            raise Exception("Pretrain the model first!")
+        if self.pretrained:
+            print("\n\n\n\n\n\n")
+        vb.print_general("Training...")
+        self.model.compile(**self.compile_kwargs)
         self.model.fit(**self.fit_kwargs)
         self.trained = True
 
@@ -120,8 +141,11 @@ class Baseline1(Models_Training):
     '''
     TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
     '''
-    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units = 1024//3):
+    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units = TPA_DENSE_DEFAULT, **kwargs):
         vb.print_general("Initializing Baseline1...")
+        
+        if "pretraining" in kwargs.keys():
+            assert not kwargs["pretraining"]
 
         io_TPAs = [_build_TPA_embedding(id, TPA_dense_units) for id in TPA_view_IDs]
         i_TPAs = [x[0] for x in io_TPAs]
@@ -135,108 +159,63 @@ class Baseline1(Models_Training):
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
         TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
         TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
-        model = Model(i_TPAs, TPA_classification, name="Model_3xTPA")
+        model = Model(i_TPAs, TPA_classification, name="Model_{}xTPA".format(len(TPA_view_IDs)))
 
         Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
 
 
+class Loss_RGB_TPA(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        self.is_placeholder = True
+        super(Loss_RGB_TPA, self).__init__(**kwargs)
 
+    def call(self, inputs):
+        self.add_loss(tf.abs(2000000. * tf.reduce_mean(inputs)), inputs=True)
+        return inputs
 
-
-
-SETUP_DIC = {"baseline1":Baseline1}
-SETUP_RGB_FLAGS = {"baseline1":False}
-
-
-'''
-
-class Models_Training():
-    def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs):
-        self.model = model
-        self.fit_kwargs = fit_kwargs
-        self.compile_kwargs = compile_kwargs
-        self.TPA_view_IDs = TPA_view_IDs
-        self.name=name
-        self.data_models_model_path = os.path.join(project.DATA_MODELS_PATH, self.name)
-        self.data_models_output_model_path = os.path.join(project.DATA_MODELS_OUTPUT_PATH, self.name)
-        paths.ensure_path_exists(self.data_models_model_path)
-        paths.ensure_path_exists(self.data_models_output_model_path)
-        self.trained = False
-        self._history = None
-        try: 
-            self.verbose = fit_kwargs["verbose"]
-        except: 
-            self.verbose = 1
-
-    def compile(self):
-        self.model.compile(**self.compile_kwargs)
+class Baseline2(Models_Training):
+    '''
+    CNN -> RGB PI PRETRAINED,
+    TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
+    '''
+    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, pretraining, precompile_kwargs = None, prefit_kwargs = None, TPA_dense_units = TPA_DENSE_DEFAULT, **kwargs):
+        vb.print_general("Initializing Baseline1...")
     
-    def fit(self):
-        fit_kwargs = self.fit_kwargs.copy()
-        valid_kwargs = self.fit_kwargs.copy()
-        try:
-            fit_kwargs["validation_data"] = None
-            valid_kwargs["x"] = valid_kwargs["validation_data"]
-            valid_kwargs.pop("validation_data")
-        except KeyError:
-            fit_kwargs["validation_data"] = None
-            valid_kwargs["x"] = None
-            vb.print_general("No validation data.")
-        try: 
-            epochs = fit_kwargs["epochs"]
-            fit_kwargs.pop("epochs")
-            valid_kwargs.pop("epochs")
-        except KeyError:
-            epochs = 1
-        for epoch in range(epochs):
-            if self.verbose:
-                print("Epoch {}/{}: training...".format(epoch, epochs))
-            history = self.model.fit(**fit_kwargs)
-            self._update_history(history)
-            if valid_kwargs["x"]:
-                if self.verbose:
-                    print("Epoch {}/{}: validation...".format(epoch, epochs))
-                valid_history = self.model.evaluate(**valid_kwargs)
-                self._update_valid_history(valid_history)
-        self.trained = True
-        return
-        self.model.fit(**self.fit_kwargs)
-        self.trained = True
+        assert pretraining
+        
+        io_TPAs = [_build_TPA_embedding(id, TPA_dense_units) for id in TPA_view_IDs]
+        i_TPAs = [x[0] for x in io_TPAs]
+        o_TPAs = [x[1] for x in io_TPAs]
 
-    @property
-    def history(self):
-        return self._history
-        #return self.model.history.history
+        if len(TPA_view_IDs) > 1:
+            TPA_merged = Concatenate(name='view_concat', axis=-1)([*o_TPAs])
+        if len(TPA_view_IDs) == 1:
+            TPA_merged = [*o_TPAs]
 
-    def _update_history(self, history_step):
-        if not self._history:
-            self._history = history_step.history
-        for key in history_step.history:
-            self._history[key] = self._history[key] + history_step.history[key]
+        rgb_dim = fit_kwargs["x"][0][0][-1].shape[-1]
+        i_RGB = Input(shape=(None, rgb_dim), name=RGB_FEATURES_LAYER_NAME)
+        flat = TimeDistributed(Flatten())(i_RGB)
+        RGB_TPA_dense = TimeDistributed(Dense(units=TPA_dense_units, activation="relu"))(flat)
+        RGB_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None))(RGB_TPA_dense)
+        RGB_classification = Activation(activation='sigmoid', name='RGB_classification')(RGB_dense)
 
-    def _update_valid_history(self, valid_history_step):
-        # no if not self._history here, self._history is assumed to be always handled
-        # by _update_history during trainiing first, if this doesn't hold anymore modify here
-        for key, value in zip(self.model.metrics_names, valid_history_step):
-            valid_key = "valid_"+key
-            try:
-                self._history[valid_key] = self._history[valid_key] + [value]
-            except KeyError:
-                self._history[valid_key] = [value]
+        RGB_TPA_diff = [Subtract(name="Diff{}".format(id))([RGB_TPA_dense, o_TPA]) for id, o_TPA in zip(TPA_view_IDs, o_TPAs)]
+        loss = Loss_RGB_TPA()(RGB_TPA_diff)
+        
 
-    def plot_loss(self):
-        if not self.trained:
-            raise Exception("Train the model first!")
-        self._plot(self.history["loss"], "loss", "epoch")
-        plt.savefig(os.path.join(self.data_models_model_path, "loss.png"))
+        rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
+        TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
+        TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
 
-    def _plot(self, x, x_label, y_label, title=None):
-        if not title:
-            title = 'Model {}'.format(x_label)
-        plt.clf
-        plt.plot(x)
-        plt.title(title)
-        plt.ylabel(''.format(x_label))
-        plt.xlabel(''.format(y_label))
-        plt.clf
-'''
+        model = Model(i_TPAs + [i_RGB], [loss, RGB_classification], name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
+        model = Model(i_TPAs + [i_RGB], TPA_classification, name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
+        model = Model(i_TPAs + [i_RGB], loss, name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
+
+        Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs, pretraining=pretraining, precompile_kwargs = precompile_kwargs, prefit_kwargs = prefit_kwargs)
+
+    
+
+
+SETUP_DIC = {"baseline1":Baseline1, "baseline2":Baseline2}
+SETUP_RGB_FLAGS = {"baseline1":False, "baseline2":True}
+

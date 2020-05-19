@@ -69,6 +69,7 @@ class Data_generator(tf.keras.utils.Sequence):
         self.RGB = RGB
         self.keys = ['array_ID{}'.format(id) for id in self.view_IDs]
         if self.RGB:
+            # RGB will always be last!
             self.keys += ['array_IDRGB']
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -111,7 +112,12 @@ class Data_generator(tf.keras.utils.Sequence):
         # Y [B,2] > [B, F, 2]
         Y = np.tile(np.expand_dims(np.array(Y), axis=1), [1, sample['frames'], 1])
         x = [np.array(view) for view in data]
-        assert all([len(view) == len(Y) for view in x])
+        if not all([len(view) == len(Y) for view in x]):
+            msg = "Number of samples inconsistent between views and labels, "
+            msg += str([len(view) for view in x])
+            raise ValueError(msg)
+        #if self.RGB:
+        #    Y = [Y, Y]
         return x, Y
         
     def on_epoch_end(self):
