@@ -14,3 +14,4 @@ dataset_dir = args.directory
 
 import json
 HTPA32x32d.dataset.convert_TXT2NPZ_TPA_RGB_Dataset(dataset_dir, frames=50, frame_shift=0, crop_to_center=True, size=(224, 224))
+HTPA32x32d.dataset.convert_TXT2NPZ_TPA_RGB_Dataset(dataset_dir, frames=100, frame_shift=0, crop_to_center=True, size=(224, 224))

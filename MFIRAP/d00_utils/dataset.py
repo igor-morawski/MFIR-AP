@@ -5,6 +5,8 @@ import MFIRAP.d00_utils.paths
 import MFIRAP.d00_utils.io
 
 def get_TPA_mean_and_std(sample_list):
+    if not sample_list:
+        raise ValueError("Sample list is empty!")
     data = read_tpa123_from_npz(sample_list[0], dtype=np.float16)[0][0][0][0][0]
     for sample in sample_list:
         tpa1, tpa2, tpa3 = read_tpa123_from_npz(sample, dtype=np.float16)

@@ -18,11 +18,12 @@ from tensorflow.keras.applications.resnet50 import ResNet50
 K = tf.keras.backend
 import datetime
 
-from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
 from MFIRAP.d03_processing.batch_processing import intermediate2processed
 from MFIRAP.d04_modelling.losses import Losses_Keras, zero_loss
 from MFIRAP.d04_modelling.training import Train_Validation_Generators, Timestamper_counted_down
-from MFIRAP.d04_modelling.metrics import Metrics_Keras, AUC_AP, Precision_AP, Recall_AP, PrecisionAtRecall_AP
+from MFIRAP.d04_modelling.metrics import Metrics_Keras, AUC_AP, Precision_AP, Recall_AP, PrecisionAtRecall_AP, Accuracy_AP
+
+from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
 from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS, RGB_FEATURES_LAYER_NAME
 
 if __name__ == "__main__":
@@ -72,7 +73,7 @@ if __name__ == "__main__":
     # settting up atta and other metrics
     metrics = Metrics_Keras(model_config["frames"], model_config["frame_shift"], train_timestamps_cd)
     atta_fnc = metrics.get_average_time_to_accident()
-    ap_metrics = [AUC_AP(), Precision_AP(), Recall_AP(), PrecisionAtRecall_AP(0.8)]
+    ap_metrics = [AUC_AP(), Accuracy_AP(), Precision_AP(), Recall_AP(), PrecisionAtRecall_AP(0.8)]
     losses = Losses_Keras(frames=model_config['frames'], frame_shift=model_config['frame_shift'])
     ##################
     # FINAL SETTINGS #

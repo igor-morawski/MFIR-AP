@@ -24,5 +24,5 @@ a_file.close()
 
 preparer = HTPA32x32d.dataset.TPA_RGB_Preparer()
 preparer.config(config_f)
-HTPA32x32d.dataset.SYNCHRONIZATION_MAX_ERROR = 0.5
+HTPA32x32d.dataset.SYNCHRONIZATION_MAX_ERROR = 5
 preparer.prepare() # now fill labels and make_config.json.

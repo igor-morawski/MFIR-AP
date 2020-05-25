@@ -67,3 +67,8 @@ class PrecisionAtRecall_AP(tf.keras.metrics.Recall):
         super().__init__(*args, **kwargs)
         self.update_state = reduce_y(self.update_state)
 
+class Accuracy_AP(tf.keras.metrics.BinaryAccuracy):
+    def __init__(self,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.update_state = reduce_y(self.update_state)
+

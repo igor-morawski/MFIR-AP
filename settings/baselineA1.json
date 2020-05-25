@@ -1,12 +1,12 @@
 {
     "name" : "baseline1",
-    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/20200508_aligned_labeled_npz_f50_fs0",
+    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/MIFR-AP-Dataset-LABELED_npz_f50_fs0",
     "frames":50,
     "frame_shift":0,
     "dataset_processed_parent_path" : "/home/igor/Desktop/Projects/MFIR-AP/data/03_processed", 
     "loss_function" : "exponential_loss",
-    "train_size" : 0.5,
-    "batch_size" : 2,
+    "train_size" : 0.8,
+    "batch_size" : 4,
     "view_IDs" : ["121", "122", "123"],
     "epochs" : 5,
     "setup" : "baseline1"

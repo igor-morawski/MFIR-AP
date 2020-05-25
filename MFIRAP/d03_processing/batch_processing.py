@@ -10,6 +10,7 @@ from MFIRAP.d00_utils.dataset import read_tpa123_from_npz, read_rgb_from_npz, st
 from tensorflow.keras.layers import Flatten, Input
 from tensorflow.keras.models import Model
 
+import pickle
 import os
 import numpy as np
 
@@ -19,6 +20,12 @@ def intermediate2processed(dataset_path, destination_parent_path, development_su
     '''
     ### BATCH MAKER START ###
     mu, sigma = _compute_devel_mu_sigma(dataset_path, destination_parent_path, development_subjects)
+    # save to dict
+    _, name = os.path.split(dataset_path)
+    pkl_fp = os.path.join(destination_parent_path, name, "scaling.pkl")
+    ensure_parent_exists(pkl_fp)
+    with open(pkl_fp, "wb") as f:
+        pickle.dump({"mu": mu, "sigma": sigma}, f)
     _intermediate2processed_development(dataset_path, destination_parent_path, development_subjects, mu, sigma, keras_model)
     _intermediate2processed_test(dataset_path, destination_parent_path, test_subjects, mu, sigma, keras_model)
     ### BATCH MAKER END ###
@@ -32,6 +39,10 @@ def _intermediate2processed_test(dataset_path, destination_parent_path, subjects
 def _compute_devel_mu_sigma(dataset_path, destination_parent_path, subjects):
     # 1. Inputs
     pos_fp_list, neg_fp_list = get_pos_neg_fp_lists(dataset_path)
+    if not pos_fp_list:
+        raise ValueError("No positive samples!")
+    if not neg_fp_list:
+        raise ValueError("No negative samples!")
     _, name = os.path.split(dataset_path)
     # 2. Leave only samples from the development subjects list!
     pos_fp_list = filter_subjects_from_fp_list(pos_fp_list, subjects)
@@ -95,7 +106,7 @@ def _batch_maker(dataset_path, destination_parent_path, subjects, devel_or_test,
         #5B. TPA standarization according to pt. 4
         tpa1, tpa2, tpa3 = [standarize_TPA(t, TPA_mean, TPA_std) for t in [tpa1, tpa2, tpa3]]
         sample_keys = list(sample.keys())
-        dict2save = {'array_ID121' : tpa1, 'array_ID122': tpa2, 'array_ID123' : tpa3, 'array_IDRGB' : rgb}
+        dict2save = {'array_ID121' : tpa1, 'array_ID122': tpa2, 'array_ID123' : tpa3, 'array_IDRGB' : rgb, 'mu' : TPA_mean, "sigma" : TPA_std}
         for key in sample_keys: 
             if key not in dict2save.keys():
                 dict2save[key] = sample[key]

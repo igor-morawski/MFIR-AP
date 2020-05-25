@@ -48,6 +48,16 @@ def _build_TPA_embedding(view_id, dense_units):
     embedding_output = dense
     return embedding_input, embedding_output
 
+class Model_Evaluation():
+    def __init__(self, model_path):
+        self.name = os.path.split(model_path)[-1]
+        json_fp = os.path.join(model_path, self.name+".json")
+        weights_fp = os.path.join(model_path, self.name+".h5")
+        with open(json_fp, 'r') as json_file:
+            model = tf.keras.models.model_from_json(json_file.read())
+        model.load_weights(weights_fp)
+        self.model = model
+
 class Models_Training():
     def __init__(self, name, model, fit_kwargs, compile_kwargs, TPA_view_IDs, pretraining = False, precompile_kwargs = None, prefit_kwargs = None):
         self.model = model
@@ -158,7 +168,7 @@ class Baseline1(Models_Training):
         
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
         TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
-        TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
+        TPA_classification = Activation(activation='softmax', name='TPA_classification')(TPA_dense)
         model = Model(i_TPAs, TPA_classification, name="Model_{}xTPA".format(len(TPA_view_IDs)))
 
         Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
@@ -205,14 +215,13 @@ class Baseline2(Models_Training):
 
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name = "TPA_GRU")(TPA_merged)
         TPA_dense = TimeDistributed(Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
-        TPA_classification = Activation(activation='sigmoid', name='TPA_classification')(TPA_dense)
+        TPA_classification = Activation(activation='softmax', name='TPA_classification')(TPA_dense)
 
         model = Model(i_TPAs + [i_RGB], [loss, RGB_classification], name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
         model = Model(i_TPAs + [i_RGB], TPA_classification, name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
         model = Model(i_TPAs + [i_RGB], loss, name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
 
         Models_Training.__init__(self, name = name, model = model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs, pretraining=pretraining, precompile_kwargs = precompile_kwargs, prefit_kwargs = prefit_kwargs)
-
     
 
 

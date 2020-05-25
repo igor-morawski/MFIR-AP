@@ -39,7 +39,7 @@ class Losses_Keras:
             positive_loss = -tf.reduce_sum(tf.broadcast_to(exp, tf.shape(log_pos)) * log_pos)
             # standard cross-entropy loss
             negative_loss = -tf.reduce_sum(log_neg)
-            total_loss = positive_loss + negative_loss
+            total_loss = positive_loss + 10*negative_loss
             return total_loss
         return exponential_loss
 
