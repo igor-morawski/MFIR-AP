@@ -18,6 +18,8 @@ class Losses_Keras:
 
     def get_exponential_loss(self, from_logits=False):
         def exponential_loss(y_true, y_pred, from_logits=from_logits):
+            #XXX add weight
+            #XXX normalize by no of frames
             # [B, F, 2], [B, F, 2]
             # TODO ADD JAIN
             # L_p = sigma_t(-exp())
