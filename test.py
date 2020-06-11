@@ -10,6 +10,7 @@
 3. Calculate metrics.
     A Generate precision-recall curves
 4. Generate report data.
+5. Save data to compare models.
 '''
 import MFIRAP.d01_data.tpa_tools as tpa_tools
 from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS, RGB_FEATURES_LAYER_NAME
@@ -30,6 +31,7 @@ from MFIRAP.d00_utils.paths import ensure_parent_exists
 import MFIRAP.d05_model_evaluation.plots as plots
 vb.VERBOSITY = vb.SPECIFIC
 
+import pickle
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
@@ -56,6 +58,9 @@ if __name__ == "__main__":
     reporting_dir = os.path.join("data", "06_reporting", config_json_name)
     reporting_img_dir = os.path.join(reporting_dir, "img")
     html_path = os.path.join(reporting_dir, "report.html")
+    save_path = os.path.join(reporting_dir, config_json_name+".pkl")
+    if os.path.exists(save_path):
+        os.remove(save_path)
     if os.path.exists(html_path):
         os.remove(html_path)
     ensure_parent_exists(html_path)
@@ -178,14 +183,16 @@ if __name__ == "__main__":
     detection_precision = DTP/(DTP+DFP) if DTP+DFP else np.NaN
     detection_recall = DTP/(DTP+DFN) if DTP+DFN else np.NaN
     detection_accuracy = (DTP+DTN)/(DTP+DTN+DFP+DFN)
-
+    plots_dict = {}
     # 3A Precision-recall curves
-    pre_precisions, pre_recalls, pre_thresholds = plots.prediction_pr_curve(labels_dict, predictions_dict)
-    det_precisions, det_recalls, det_thresholds = plots.detection_pr_curve(labels_dict, predictions_dict)
+    prc_pre_precisions, prc_pre_recalls, prc_pre_thresholds = plots.prediction_pr_curve(labels_dict, predictions_dict)
+    prc_det_precisions, prc_det_recalls, prc_det_thresholds = plots.detection_pr_curve(labels_dict, predictions_dict)
     lim_eps = 0.1
+    plots_dict["precision_recall_curve"] = {"precision":prc_pre_precisions, "recall":prc_pre_recalls, "thresholds":prc_pre_thresholds}
+    plots_dict["detection_precision_recall_curve"] = {"precision":prc_det_precisions, "recall":prc_det_recalls, "thresholds":prc_det_thresholds}
 
     # prediction precision-recall curve
-    plt.plot(pre_recalls[:-1], pre_precisions[:-1])
+    plt.plot(prc_pre_recalls[:-1], prc_pre_precisions[:-1])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
     plt.title("Precision-Recall Curve for Prediction, {}".format(config_json_name))
@@ -195,13 +202,40 @@ if __name__ == "__main__":
     plt.close()
 
     # detection precision-recall curve
-    plt.plot(det_recalls[:-1], det_precisions[:-1])
+    plt.plot(prc_det_recalls[:-1], prc_det_precisions[:-1])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title("Precision-Recall Curve for Detectiom, {}".format(config_json_name))
+    plt.title("Precision-Recall Curve for Detection, {}".format(config_json_name))
     plt.xlim(0, 1+lim_eps)
     plt.ylim(0, 1+lim_eps)
     plt.savefig(os.path.join(reporting_img_dir, "detection_precision_recall_curve.png"))
+    plt.close()
+
+    # 3B ROC
+    prc_pre_fpr, prc_pre_tpr, prc_pre_thresholds = plots.prediction_roc_curve(labels_dict, predictions_dict)
+    prc_det_fpr, prc_det_tpr, prc_det_thresholds = plots.detection_roc_curve(labels_dict, predictions_dict)
+    plots_dict["roc"] = {"fpr":prc_pre_fpr, "tpr":prc_pre_tpr, "thresholds":prc_pre_thresholds}
+    plots_dict["detection_roc"] = {"fpr":prc_det_fpr, "tpr":prc_det_tpr, "thresholds":prc_det_thresholds}
+    lim_eps = 0.1
+
+    # prediction precision-recall curve
+    plt.plot(prc_pre_fpr[:-1], prc_pre_tpr[:-1])
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title("ROC for Prediction, {}".format(config_json_name))
+    plt.xlim(0, 1+lim_eps)
+    plt.ylim(0, 1+lim_eps)
+    plt.savefig(os.path.join(reporting_img_dir, "prediction_roc.png"))
+    plt.close()
+
+    # detection precision-recall curve
+    plt.plot(prc_det_fpr[:-1], prc_det_tpr[:-1])
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title("ROC for Detection, {}".format(config_json_name))
+    plt.xlim(0, 1+lim_eps)
+    plt.ylim(0, 1+lim_eps)
+    plt.savefig(os.path.join(reporting_img_dir, "detection_roc.png"))
     plt.close()
 
     # PRC, DPRC, ATTARC, APTRC 
@@ -390,8 +424,20 @@ if __name__ == "__main__":
             <img src="img/prediction_precision_recall_curve.png"><br>
             <img src="img/detection_precision_recall_curve.png"><br>
 
+            <h3>ROC</h3>
+            <img src="img/prediction_roc.png"><br>
+            <img src="img/detection_roc.png"><br>
+
         </body>
     </html> 
     '''.format(**report_data)
     with open(html_path, 'w') as f:
         f.write(report_html)
+
+    #5 
+    data_dict = {"name": config_json_name, "metrics_dict":metrics_dict, "plots_dict":plots_dict}
+    with open(save_path, 'wb') as f:
+        pickle.dump(data_dict, f)
+
+
+
