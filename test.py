@@ -12,6 +12,8 @@
 4. Generate report data.
 5. Save data to compare models.
 '''
+import matplotlib.pyplot as plt
+import pickle
 import MFIRAP.d01_data.tpa_tools as tpa_tools
 from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS, RGB_FEATURES_LAYER_NAME
 from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
@@ -30,12 +32,9 @@ import MFIRAP.d00_utils.project as project
 from MFIRAP.d00_utils.paths import ensure_parent_exists
 import MFIRAP.d05_model_evaluation.plots as plots
 vb.VERBOSITY = vb.SPECIFIC
-
-import pickle
-import matplotlib.pyplot as plt
+import shutil
 
 if __name__ == "__main__":
-    optimal_threshold = 0.8  # XXX
     parser = argparse.ArgumentParser()
     parser.add_argument('config_json_name', type=str)
     args = parser.parse_args()
@@ -65,8 +64,8 @@ if __name__ == "__main__":
         os.remove(html_path)
     ensure_parent_exists(html_path)
     ensure_parent_exists(os.path.join(reporting_img_dir, "dummy.ext"))
-    
-    #1. Read in trained model, also mu and sigma.
+
+    #1. Read in trained model, also mu and sigma, as well as optimal threshold
     name = config_json_name
     data_models_model_path = os.path.join(project.DATA_MODELS_PATH, name)
     data_models_output_model_path = os.path.join(
@@ -74,6 +73,10 @@ if __name__ == "__main__":
     vb.print_specific("Model path {}".format(data_models_model_path))
     setup = Model_Evaluation(data_models_model_path, stateful=False)
     mu, sigma = [setup.scaling[key] for key in ['mu', 'sigma']]
+    # https://support.sas.com/en/books/reference-books/analyzing-receiver-operating-characteristic-curves-with-sas/review.html
+    # Gonen, Mithat. 2007. Analyzing Receiver Operating Characteristic Curves with SAS. Cary, NC: SAS Institute Inc.
+    with open(os.path.join(data_models_model_path, "threshold.pkl"), "rb") as f:
+        optimal_threshold = pickle.load(f)
 
     #2A. Read in list of clips to test on.
     subjects = ds.read_test_subjects()
@@ -119,7 +122,7 @@ if __name__ == "__main__":
         timestamps_dict[prefix] = np.array(timestamps).max(axis=0)
         labels_dict[prefix] = label
     # now we have:
-    # predictions_dict, timestamps_dict, labels_dict, sample_classes_dict, 
+    # predictions_dict, timestamps_dict, labels_dict, sample_classes_dict,
 
     # Metrics: #XXX +ROC!
     # Calculated in this step: TP, TN, FP, FN, TT_sum, DTP, DTN, DFP, DFN < D = detection
@@ -184,12 +187,27 @@ if __name__ == "__main__":
     detection_recall = DTP/(DTP+DFN) if DTP+DFN else np.NaN
     detection_accuracy = (DTP+DTN)/(DTP+DTN+DFP+DFN)
     plots_dict = {}
+
+         
+    metrics_dict = {"ATTA": ATTA, "APT": APT,
+                    "precision": precision, "recall": recall,
+                    "accuracy": accuracy,
+                    "detection_precision": detection_precision, "detection_recall": detection_recall,
+                    "detection_accuracy": detection_accuracy,
+                    "TP": TP, "TN": TN, "FP": FP, "FN": FN,
+                    "DTP": DTP, "DTN": DTN, "DFP": DFP, "DFN": DFN}
+
+
     # 3A Precision-recall curves
-    prc_pre_precisions, prc_pre_recalls, prc_pre_thresholds = plots.prediction_pr_curve(labels_dict, predictions_dict)
-    prc_det_precisions, prc_det_recalls, prc_det_thresholds = plots.detection_pr_curve(labels_dict, predictions_dict)
+    prc_pre_precisions, prc_pre_recalls, prc_pre_thresholds = plots.prediction_pr_curve(
+        labels_dict, predictions_dict)
+    prc_det_precisions, prc_det_recalls, prc_det_thresholds = plots.detection_pr_curve(
+        labels_dict, predictions_dict)
     lim_eps = 0.1
-    plots_dict["precision_recall_curve"] = {"precision":prc_pre_precisions, "recall":prc_pre_recalls, "thresholds":prc_pre_thresholds}
-    plots_dict["detection_precision_recall_curve"] = {"precision":prc_det_precisions, "recall":prc_det_recalls, "thresholds":prc_det_thresholds}
+    plots_dict["precision_recall_curve"] = {
+        "precision": prc_pre_precisions, "recall": prc_pre_recalls, "thresholds": prc_pre_thresholds}
+    plots_dict["detection_precision_recall_curve"] = {
+        "precision": prc_det_precisions, "recall": prc_det_recalls, "thresholds": prc_det_thresholds}
 
     # prediction precision-recall curve
     plt.plot(prc_pre_recalls[:-1], prc_pre_precisions[:-1])
@@ -198,7 +216,8 @@ if __name__ == "__main__":
     plt.title("Precision-Recall Curve for Prediction, {}".format(config_json_name))
     plt.xlim(0, 1+lim_eps)
     plt.ylim(0, 1+lim_eps)
-    plt.savefig(os.path.join(reporting_img_dir, "prediction_precision_recall_curve.png"))
+    plt.savefig(os.path.join(reporting_img_dir,
+                             "prediction_precision_recall_curve.png"))
     plt.close()
 
     # detection precision-recall curve
@@ -208,14 +227,23 @@ if __name__ == "__main__":
     plt.title("Precision-Recall Curve for Detection, {}".format(config_json_name))
     plt.xlim(0, 1+lim_eps)
     plt.ylim(0, 1+lim_eps)
-    plt.savefig(os.path.join(reporting_img_dir, "detection_precision_recall_curve.png"))
+    plt.savefig(os.path.join(reporting_img_dir,
+                             "detection_precision_recall_curve.png"))
     plt.close()
 
     # 3B ROC
-    prc_pre_fpr, prc_pre_tpr, prc_pre_thresholds = plots.prediction_roc_curve(labels_dict, predictions_dict)
-    prc_det_fpr, prc_det_tpr, prc_det_thresholds = plots.detection_roc_curve(labels_dict, predictions_dict)
-    plots_dict["roc"] = {"fpr":prc_pre_fpr, "tpr":prc_pre_tpr, "thresholds":prc_pre_thresholds}
-    plots_dict["detection_roc"] = {"fpr":prc_det_fpr, "tpr":prc_det_tpr, "thresholds":prc_det_thresholds}
+    prc_pre_fpr, prc_pre_tpr, prc_pre_thresholds = plots.prediction_roc_curve(
+        labels_dict, predictions_dict)
+    prc_det_fpr, prc_det_tpr, prc_det_thresholds = plots.detection_roc_curve(
+        labels_dict, predictions_dict)
+    prediction_auc = plots.auc(prc_pre_fpr, prc_pre_tpr)
+    detection_auc = plots.auc(prc_det_fpr, prc_det_tpr)
+    metrics_dict["prediction_auc"] = prediction_auc
+    metrics_dict["detection_auc"] = detection_auc
+    plots_dict["roc"] = {"fpr": prc_pre_fpr,
+                         "tpr": prc_pre_tpr, "thresholds": prc_pre_thresholds}
+    plots_dict["detection_roc"] = {
+        "fpr": prc_det_fpr, "tpr": prc_det_tpr, "thresholds": prc_det_thresholds}
     lim_eps = 0.1
 
     # prediction precision-recall curve
@@ -238,20 +266,54 @@ if __name__ == "__main__":
     plt.savefig(os.path.join(reporting_img_dir, "detection_roc.png"))
     plt.close()
 
-    # PRC, DPRC, ATTARC, APTRC 
+    # PRC, DPRC, ATTARC, APTRC
     # precisions, recalls, thresholds = precision_recall_curve(...)
     # detection_precisions, detection_recalls, detection_thresholds = detection_precision_recall_curve(...)
     # attas, recalls, thresholds = detection_precision_recall_curve(...)
     # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html
 
     # FINAL: GENERATE REPORT (HTML)
-    metrics_dict = {"ATTA": ATTA, "APT": APT, 
-                    "precision": precision, "recall": recall,
-                    "accuracy": accuracy,
-                    "detection_precision": detection_precision, "detection_recall": detection_recall,
-                    "detection_accuracy": detection_accuracy, 
-                    "TP": TP, "TN": TN, "FP": FP, "FN": FN, 
-                    "DTP": DTP, "DTN": DTN, "DFP": DFP, "DFN": DFN}
+    summary = '''
+    <table>
+    <thead>
+    <tr>
+        <th>Parameter</th>
+        <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>Epochs</td>
+        <td>{epochs}</td>
+    </tr>
+    <tr>
+        <td>Batch size</td>
+        <td>{batch_size}</td>
+    </tr>
+    <tr>
+        <td>Train set size</td>
+        <td>{train_size}</td>
+    </tr>
+    <tr>
+        <td>Loss fnc.</td>
+        <td>{loss_function}</td>
+    </tr>
+    <tr>
+        <td>Frames</td>
+        <td>{frames}</td>
+    </tr>
+    <tr>
+        <td>Frame shift</td>
+        <td>{frame_shift}</td>
+    </tr>
+    <tr>
+        <td>Views</td>
+        <td>{view_IDs}</td>
+    </tr>
+    </tbody>
+    </table>
+    {description}
+    '''.format(**{"config_json_name": config_json_name}, **model_config)
 
     cfs_table = '''
     <table>
@@ -359,14 +421,15 @@ if __name__ == "__main__":
     '''.format(**metrics_dict)
 
     ################################################################
+    shutil.copy2(src=os.path.join("data", "04_models", config_json_name, config_json_name+".png"), dst=os.path.join(reporting_img_dir, "model.png"))
     dt = datetime.datetime.now()
-    report_data = {"config_json_name": config_json_name, "date" : dt.date(), "time" : dt.time(), "optimal_threshold" : optimal_threshold,
+    report_data = {"summary": summary, "config_json_name": config_json_name, "date": dt.date(), "time": dt.time(), "optimal_threshold": optimal_threshold,
                    "cfs_table": cfs_table, "metrics_table": metrics_table, "samples_n": len(prefixes), "pos_n": DTP+DFN, "neg_n": DTN + DFP}
 
     report_html = '''
     <html>
         <head>
-
+            
             <title>Evaluation report: {config_json_name}</title>
             <style type = text/css>
                 html {{
@@ -409,10 +472,12 @@ if __name__ == "__main__":
         </head>
 
         <body>
-
             <h1>Evaluation report: {config_json_name}</h1>
             <!-- *** General info *** --->
+            <b>
             Tested on {samples_n} samples: {pos_n} positive and {neg_n} negative. <br> Report generated on {date}, {time}.
+            </b>
+            {summary}metrics_dict
             <!-- *** Table: metrics  *** --->
             <h2>Performance in numbers</h2>
             Calculations correspond to threshold T={optimal_threshold:.2f}
@@ -428,16 +493,17 @@ if __name__ == "__main__":
             <img src="img/prediction_roc.png"><br>
             <img src="img/detection_roc.png"><br>
 
+            <h3>Architecture</h3>
+            <img src="img/model.png"><br>
         </body>
     </html> 
     '''.format(**report_data)
     with open(html_path, 'w') as f:
         f.write(report_html)
 
-    #5 
-    data_dict = {"name": config_json_name, "metrics_dict":metrics_dict, "plots_dict":plots_dict}
+    #5
+    data_dict = {"name": config_json_name,
+                 "metrics_dict": metrics_dict, "plots_dict": plots_dict}
     with open(save_path, 'wb') as f:
         pickle.dump(data_dict, f)
-
-
 

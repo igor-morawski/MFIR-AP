@@ -78,7 +78,7 @@ class Data_generator(tf.keras.utils.Sequence):
     
     def __len__(self):
         m = len(self.pos_samples) if len(self.pos_samples) < len(self.neg_samples) else len(self.neg_samples)
-        return int(np.floor(m) / self.batch_size)
+        return int(np.floor(m) / (self.batch_size // 2))
     
     def __getitem__(self, index):
         indices = list(range(index * self.pos_in_batch_n, (index + 1) * self.pos_in_batch_n))

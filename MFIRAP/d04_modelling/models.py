@@ -11,6 +11,7 @@ import glob
 import os
 import json
 import pickle
+import shutil
 
 import MFIRAP.d00_utils.verbosity as vb
 import MFIRAP.d00_utils.paths as paths
@@ -147,6 +148,7 @@ class Models_Training():
             self.data_models_model_path, self.name+".h5"))
         tf.keras.utils.plot_model(self.model, os.path.join(
             self.data_models_model_path, self.name+".png"))
+        shutil.copy2(os.path.join("settings",self.name+".json"), os.path.join(self.data_models_model_path, "settings.json"))
         # Save report data
         '''
         report_data = dict()
@@ -207,7 +209,8 @@ class Baseline1(Models_Training):
     '''
 
     def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units=TPA_DENSE_DEFAULT, **kwargs):
-        vb.print_general("Initializing Baseline1...")
+        vb.print_general("Initializing {} - Baseline1...".format(name))
+        vb.print_general("Model trained on {} views".format(TPA_view_IDs))
 
         if "pretraining" in kwargs.keys():
             assert not kwargs["pretraining"]
@@ -244,7 +247,7 @@ class Loss_RGB_TPA(tf.keras.layers.Layer):
         self.add_loss(tf.abs(2000000. * tf.reduce_mean(inputs)), inputs=True)
         return inputs
 
-
+"""
 class Baseline2(Models_Training):
     '''
     CNN -> RGB PI PRETRAINED,
@@ -296,7 +299,7 @@ class Baseline2(Models_Training):
 
         Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs,
                                  TPA_view_IDs=TPA_view_IDs, pretraining=pretraining, precompile_kwargs=precompile_kwargs, prefit_kwargs=prefit_kwargs)
+"""
 
-
-SETUP_DIC = {"baseline1": Baseline1, "baseline2": Baseline2}
-SETUP_RGB_FLAGS = {"baseline1": False, "baseline2": True}
+SETUP_DIC = {"baseline1": Baseline1}
+SETUP_RGB_FLAGS = {"baseline1": False}

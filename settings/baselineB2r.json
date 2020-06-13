@@ -1,14 +1,14 @@
 {
     "name" : "baseline1",
-    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Dataset-LABELED_npz_f50_fs0",
-    "frames":50,
+    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Dataset-LABELED_npz_f100_fs0",
+    "frames":100,
     "frame_shift":0,
     "dataset_processed_parent_path" : "/media/igor/DATA/03_processed", 
     "loss_function" : "exponential_loss",
     "train_size" : 1,
     "batch_size" : 16,
-    "view_IDs" : ["121", "122", "123"],
+    "view_IDs" : ["122"],
     "epochs" : 10,
     "setup" : "baseline1", 
-    "description" : "Baseline; frame number and shift ablation."
+    "description" : "Baseline; view ablation."
 }

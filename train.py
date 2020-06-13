@@ -16,12 +16,18 @@ from tensorflow.keras.applications.resnet50 import ResNet50
 import tensorflow as tf
 import shutil
 import os
+import pickle
 import argparse
 import MFIRAP
 import MFIRAP.d00_utils.io as io
 import MFIRAP.d00_utils.dataset as ds
 import MFIRAP.d00_utils.verbosity as vb
 vb.VERBOSITY = vb.SPECIFIC
+
+import MFIRAP.d05_model_evaluation.plots as plots
+import matplotlib.pyplot as plt
+import itertools
+import numpy as np
 
 K = tf.keras.backend
 
@@ -64,7 +70,8 @@ if __name__ == "__main__":
         intermediate2processed(dataset_path, destination_parent_path,
                                ds.read_development_subjects(), ds.read_test_subjects(), base_model)
     # 2.
-    vb.print_specific("Creating training and validation data generators...")
+    vb.print_specific("Creating training and validation data generators...")    
+    plt.clf()
     generators = Train_Validation_Generators(dataset_path=processed_develop_path, view_IDs=model_config["view_IDs"], train_size=model_config[
                                              'train_size'], batch_size=model_config['batch_size'], RGB=SETUP_RGB_FLAGS[model_config["setup"]])
     train_generator = generators.get_train()
@@ -136,3 +143,30 @@ if __name__ == "__main__":
                  os.path.join(setup.data_models_model_path, "scaling.pkl"))
     # 5. Generate plots.
     setup.plot_metrics(plot_val_metrics=valid_generator)
+    # Get optimal threshold.
+    preds_list, trues_list = [], []
+    generators = [train_generator, valid_generator] if valid_generator else [train_generator]
+    for generator in generators:
+        for i in range(len(generator)):
+            x, y = generator[i]
+            preds_list.append(setup.model.predict(x))
+            trues_list.append(y)
+    preds = np.vstack(preds_list)
+    trues = np.vstack(trues_list)
+    labels_dict, predictions_dict = {}, {}
+    for idx, l in enumerate(zip(preds, trues)):
+        pred, true = l
+        predictions_dict[idx] = pred[:, 1]
+        sample_class = true[-1][-1]
+        labels_dict[idx] = model_config["frames"]-model_config["frame_shift"] if sample_class else -1
+    prc_pre_fpr, prc_pre_tpr, prc_pre_thresholds = plots.prediction_pr_curve(labels_dict, predictions_dict)
+
+    # get optimal threshold
+    fpr, tpr, thresh = prc_pre_fpr[:-1], prc_pre_tpr[:-1], prc_pre_thresholds
+    xy = np.stack([fpr, tpr]).T
+    ideal = np.array([1,1])
+    d = ideal-xy
+    D = (d*d).sum(axis=-1)
+    optimal_threshold= thresh[D.argmin()]
+    with open(os.path.join(setup.data_models_model_path, "threshold.pkl"), "wb") as f:
+        pickle.dump(optimal_threshold, f)

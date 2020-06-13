@@ -33,11 +33,11 @@ def _precision_recall_curve(fps, tps, thresholds):
     return np.r_[precision[sl], 1], np.r_[recall[sl], 0], thresholds[sl]
 
 def prediction_pr_curve(labels_dict, y_pred_dict):
-    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=False)
+    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=True)
     return _precision_recall_curve(fps, tps, thresholds)
 
 def detection_pr_curve(labels_dict, y_pred_dict):
-    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=True)
+    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=False)
     return _precision_recall_curve(fps, tps, thresholds)
 
 def _roc_curve(fps, tps, thresholds):
@@ -61,13 +61,36 @@ def _roc_curve(fps, tps, thresholds):
     return fpr, tpr, thresholds
 
 def prediction_roc_curve(labels_dict, y_pred_dict):
-    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=False)
-    return _roc_curve(fps, tps, thresholds)
-
-def detection_roc_curve(labels_dict, y_pred_dict):
     fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=True)
     return _roc_curve(fps, tps, thresholds)
 
+def detection_roc_curve(labels_dict, y_pred_dict):
+    fps, tps, thresholds = _tfps_per_thresh(labels_dict, y_pred_dict, crop_past_label=False)
+    return _roc_curve(fps, tps, thresholds)
+
+def auc(x, y):
+    """
+    Adapted from scikit
+    https://github.com/scikit-learn/scikit-learn/blob/fd237278e/sklearn/metrics/_ranking.py#L42
+    """
+    if x.shape[0] < 2:
+        return np.NaN
+
+    direction = 1
+    dx = np.diff(x)
+    if np.any(dx < 0):
+        if np.all(dx <= 0):
+            direction = -1
+        else:
+            return np.NaN
+                             
+    area = direction * np.trapz(y, x)
+    if isinstance(area, np.memmap):
+        # Reductions such as .sum used internally in np.trapz do not return a
+        # scalar by default for numpy.memmap instances contrary to
+        # regular numpy.ndarray instances.
+        area = area.dtype.type(area)
+    return area
 
 # XXX
 def _at_per_thresh(labels_dict, y_pred_dict, timestamps_dict, crop_past_label=False):

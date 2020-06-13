@@ -1,8 +1,8 @@
 {
     "name" : "baseline1",
-    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Dataset-LABELED_npz_f50_fs0",
-    "frames":50,
-    "frame_shift":0,
+    "dataset_intermediate_path": "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Dataset-LABELED_npz_f100_fs20",
+    "frames":100,
+    "frame_shift":20,
     "dataset_processed_parent_path" : "/media/igor/DATA/03_processed", 
     "loss_function" : "exponential_loss",
     "train_size" : 1,

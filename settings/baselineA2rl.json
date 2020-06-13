@@ -7,8 +7,8 @@
     "loss_function" : "exponential_loss",
     "train_size" : 1,
     "batch_size" : 16,
-    "view_IDs" : ["121", "122", "123"],
+    "view_IDs" : ["122", "123"],
     "epochs" : 10,
     "setup" : "baseline1", 
-    "description" : "Baseline; frame number and shift ablation."
+    "description" : "Baseline; view ablation."
 }
