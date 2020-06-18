@@ -14,3 +14,5 @@ MODEL_CONFIG_KEYS = ['setup', 'dataset_intermediate_path', 'dataset_processed_pa
                      'train_size', 'batch_size', 'loss_function', 'frames', 'frame_shift', 'view_IDs', 'epochs']
 
 TRAIN_LOG_FP = os.path.join("train.log")
+
+DATA_VISUALIZATION_PATH = os.path.join("data", "07_visualization")

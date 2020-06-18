@@ -1,5 +1,6 @@
 {
     "development_subjects" : ["subject1", "subject2", "subject3", "subject4", "subject5", "subject6", "subject7", "subject8", "subject9"],
     "test_subjects" : ["subject10", "subject11", "subject12"],
-    "test_set_path" : "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Testing-LABELED"
+    "test_set_path" : "/media/igor/DATA/PIPELINE/D01_MIFR-AP-Testing-LABELED",
+    "gifs_path" : "/media/igor/DATA/D01_MIFR-AP-gifs"
 }

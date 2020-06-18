@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
+import copy
 
 # https://stackoverflow.com/questions/4700614/how-to-put-the-legend-out-of-the-plot
 # https://stackoverflow.com/questions/40865645/confusion-about-precision-recall-curve-and-average-precision
@@ -51,26 +52,45 @@ if __name__ == "__main__":
     for model in models:
         with open(os.path.join("data", "06_reporting", model, model+".pkl"), 'rb') as f:
             d = pickle.load(f)
-        models_data_dict[model] = d
+        models_data_dict[model] = copy.deepcopy(d)
         models_data_dict[model]["metrics_dict"]["name"] = model
+        models_data_dict[model]["is_alias"] = False
         # add ablation *1x -> *2
         if model[-1] == "1":
             alias = model[:-1]+"2crl"
-            models_data_dict[alias] = d
+            models_data_dict[alias] = copy.deepcopy(d)
             models_data_dict[alias]["metrics_dict"]["name"] = alias
+            models_data_dict[alias]["is_alias"] = True
     for key in models_data_dict.keys():
         if key not in models:
             models.append(key)
 
     
 
-    # ROC and PRC
+    # ROC, PRC, ATPC, ATRC
     rocs, det_rocs, prc, det_prc = [{} for i in range(4)]
+    aptpc, adtpc, aptrc, adtrc = [{} for i in range(4)]
+    min_avg_ts, max_avg_ts = {}, {}
     for model in models:
         rocs[model] = models_data_dict[model]['plots_dict']['roc']
         det_rocs[model] = models_data_dict[model]['plots_dict']['detection_roc']
         prc[model] = models_data_dict[model]['plots_dict']['precision_recall_curve']
         det_prc[model] = models_data_dict[model]['plots_dict']['detection_precision_recall_curve']
+        aptpc[model] = models_data_dict[model]['plots_dict']['apt_precision_curve']
+        adtpc[model] = models_data_dict[model]['plots_dict']['adt_precision_curve']
+        aptrc[model] = models_data_dict[model]['plots_dict']['apt_recall_curve']
+        adtrc[model] = models_data_dict[model]['plots_dict']['adt_recall_curve']
+        min_avg_ts[model] = models_data_dict[model]['plots_dict']['min_avg_t']
+        max_avg_ts[model] = models_data_dict[model]['plots_dict']['max_avg_t']
+
+    # assert all ts are equal, tolerate roundoff errors etc
+    _minl = np.array([v for v in min_avg_ts.values()])
+    _maxl = np.array([v for v in max_avg_ts.values()])
+    assert_d = 1
+    assert round(_minl.min(), assert_d) == round(_minl.max(), assert_d)
+    assert round(_maxl.min(), assert_d) == round(_maxl.max(), assert_d)
+    min_avg_ts, max_avg_t = _minl.min(), _maxl.min()
+
 
     # plot settings
     from matplotlib.font_manager import FontProperties
@@ -161,12 +181,81 @@ if __name__ == "__main__":
         plots_fps.append(os.path.relpath(fp, reporting_dir))
         plt.close()
     
+        # APT-Recall
+        plt.title('APT-recall curve - prediction {}'.format("(ablation {})".format(ablation) if ablation else "(all models)"))
+        for model in models:
+            if ablation not in model:
+                continue
+            d = aptrc[model]
+            apt, recall = d['apt'], d['recall']
+            plt.plot(recall, apt, label=model, **plot_args)
+        plt.xlabel('Recall')
+        plt.ylabel('APT')
+        plt.legend(**loc_args)
+        draw_hline(y=max_avg_t)
+        fp = os.path.join(plots_dir, "apt_recall_curve{}.png".format(ablation))
+        plt.savefig(fp, bbox_inches='tight')
+        plots_fps.append(os.path.relpath(fp, reporting_dir))
+        plt.close()
+            
+        # ADT-Recall
+        plt.title('ADT-recall curve - detection {}'.format("(ablation {})".format(ablation) if ablation else "(all models)"))
+        for model in models:
+            if ablation not in model:
+                continue
+            d = adtrc[model]
+            adt, recall = d['adt'], d['recall']
+            plt.plot(recall, adt, label=model, **plot_args)
+        plt.xlabel('Recall')
+        plt.ylabel('ADT')
+        plt.legend(**loc_args)
+        draw_hline(y=max_avg_t)
+        fp = os.path.join(plots_dir, "adt_recall_curve{}.png".format(ablation))
+        plt.savefig(fp, bbox_inches='tight')
+        plots_fps.append(os.path.relpath(fp, reporting_dir))
+        plt.close()
+    
+        # APT-Precision
+        plt.title('APT-recall curve - prediction {}'.format("(ablation {})".format(ablation) if ablation else "(all models)"))
+        for model in models:
+            if ablation not in model:
+                continue
+            d = aptpc[model]
+            apt, precision = d['apt'], d['precision']
+            plt.plot(precision, apt, label=model, **plot_args)
+        plt.xlabel('Precision')
+        plt.ylabel('APT')
+        plt.legend(**loc_args)
+        draw_hline(y=max_avg_t)
+        fp = os.path.join(plots_dir, "apt_precision_curve{}.png".format(ablation))
+        plt.savefig(fp, bbox_inches='tight')
+        plots_fps.append(os.path.relpath(fp, reporting_dir))
+        plt.close()
+            
+        # ADT-Precision
+        plt.title('ADT-precision curve - detection {}'.format("(ablation {})".format(ablation) if ablation else "(all models)"))
+        for model in models:
+            if ablation not in model:
+                continue
+            d = adtpc[model]
+            adt, precision = d['adt'], d['precision']
+            plt.plot(precision, adt, label=model, **plot_args)
+        plt.xlabel('Precision')
+        plt.ylabel('ADT')
+        plt.legend(**loc_args)
+        draw_hline(y=max_avg_t)
+        fp = os.path.join(plots_dir, "adt_precision_curve{}.png".format(ablation))
+        plt.savefig(fp, bbox_inches='tight')
+        plots_fps.append(os.path.relpath(fp, reporting_dir))
+        plt.close()
+
+        
     plots_fps.sort()
     # /plots
 
     report_data = {}
     plots_html = str(
-        "".join(['''<img src="{}"><br>'''.format(e) for e in plots_fps]))
+        "".join(['''<img src="{}"><br>Figure {}<br>'''.format(e, i) for i, e in enumerate(plots_fps)]))
     report_data["plots_html"] = plots_html
     _links_fps = [os.path.join(
         "data", "06_reporting", model, "report.html") for model in models]
@@ -191,7 +280,7 @@ if __name__ == "__main__":
     sortable_header = "".join(header_cell_pattern.format(h)
                               for h in sortable_header_keys)
     sortable_table_content = "".join([(row_pattern.format("".join(cell_formatter(
-        models_data_dict[model]["metrics_dict"][key]) for key in sortable_header_keys))) for model in models])
+        models_data_dict[model]["metrics_dict"][key]) for key in sortable_header_keys))) if not models_data_dict[model]["is_alias"] else "" for model in models])
 
     sortable_header = sortable_header.replace("_", " ")
 

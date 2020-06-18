@@ -61,3 +61,6 @@ def read_test_subjects(dataset_config_json = os.path.join("settings", "dataset.j
 
 def read_test_set_path(dataset_config_json = os.path.join("settings", "dataset.json")):
     return MFIRAP.d00_utils.io.read_json_key(dataset_config_json, 'test_set_path')
+
+def read_gifs_path(dataset_config_json = os.path.join("settings", "dataset.json")):
+    return MFIRAP.d00_utils.io.read_json_key(dataset_config_json, 'gifs_path')
