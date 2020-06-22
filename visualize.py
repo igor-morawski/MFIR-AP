@@ -24,6 +24,8 @@ import imageio
 import cv2
 import glob
 
+from matplotlib.ticker import PercentFormatter
+
 DPI = 100
 
 pos10 = ["20200605_1418_", "20200605_1510_", "20200605_1503_"]
@@ -127,12 +129,16 @@ if __name__ == "__main__":
         figure_height_inches = figure_width_inches*3/4
         fig = plt.figure(num=0, figsize=[figure_width_inches, figure_height_inches], dpi=DPI)
         plt.rcParams["figure.figsize"] = [figure_width_inches, figure_height_inches]
+        plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+        plt.title("Predicted probability of the action in the near future")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Predicted probability")
         plt.xlim([0, timestamps[-1]])
         plt.ylim([0, 1])
         th_line = plt.axhline(optimal_threshold, **{"color": 'green', "linestyle": '--'})
         for idx in range(len(timestamps)):
             x, y = timestamps[:idx], predictions[:idx]
-            plt.plot(x, y, color='black')
+            plt.plot(x, y, color='black') 
             if predictions[idx] >= optimal_threshold:
                 th_line.set_color('red')
             fig.canvas.draw()
@@ -142,13 +148,54 @@ if __name__ == "__main__":
         fig.clf()
         plt.close()
         big_width = int(2 * width)
-        big_height = int(big_width*3/4 if big_width*3/4 > height else height)
+        big_height = int(height)
         assert data.shape[-1] == array.shape[-1]
         plots = np.array(plots, dtype=np.uint8)
         W, H = big_width, big_height
         gw, gh = width, height
         ph, pw, _ = plots[0].shape
         video = np.ones([T, H, W, ch], dtype=np.uint8) * 255
+        # draw text
+        # A: ALARM < grey or red (depends on whether the threshold was exceeded before)
+        # B: time to the action onset (s)
+        # C: time to the alarm
+        font                   = cv2.FONT_HERSHEY_DUPLEX
+        alarmLoc = (960-70, 200)
+        fontColor              = (0,0,0)
+        text_alarm_dict = {"text":"ALARM", "org":alarmLoc, "fontFace":font, "fontScale":1.5, "lineType":2, "thickness": 2}
+        tt_alarm_dict = {"fontFace":font, "fontScale":0.75, "lineType":2, "thickness": 2, "color":(0, 0, 0)}
+        # logic
+        alarm_flag = False
+        sample_class = sample_classes_dict[dict_key]
+        sample_label = labels_dict[dict_key]
+        T_action = timestamps[sample_label] if (sample_label > 0) else np.NaN
+        th_ex = (predictions >= optimal_threshold)
+        T_alarm = timestamps[np.where(th_ex)].min() if np.any(th_ex) else np.NaN 
+        # handle cases by looking at np.NaN
+        for idx, f in enumerate(video):
+            #A
+            if predictions[idx] >= optimal_threshold:
+                alarm_flag = True
+            if alarm_flag:
+                cv2.putText(f, **text_alarm_dict, color=(255, 0, 0))
+            else:
+                cv2.putText(f, **text_alarm_dict, color=(200, 200, 200))
+            #B, C
+            current_timestamp = timestamps[idx]
+            tta_onset = T_action - current_timestamp
+            tta_alarm = T_alarm - current_timestamp
+            diff = tta_onset-tta_alarm
+            text1 = "Time to the action onset: {: >7.2f} (s)".format(tta_onset)
+            text2 = "Time to sounding alarm: {: >8.2f} (s)".format(tta_alarm)
+            text3 = "Action predicted {:.2f} s before its onset".format(diff)
+            if not np.isnan(tta_onset):
+                cv2.putText(f, text=text1, org=(700, 45), **tt_alarm_dict)
+            if not np.isnan(tta_alarm):
+                cv2.putText(f, text=text2, org=(700, 90), **tt_alarm_dict)
+            if not np.isnan(diff):
+                cv2.putText(f, text=text3, org=(700, 135), **tt_alarm_dict)
+
+        ###########
         segment_size = 200
         segments = [(i*segment_size, (i+1)*segment_size if (i+1)*segment_size<=T else T) for i in range(int(np.ceil(T/segment_size)))]
         for segment in segments:
@@ -167,7 +214,7 @@ if __name__ == "__main__":
         pattern = os.path.join(output_dir, "*.mp4")
         vids2delete = glob.glob(pattern)
         if vids2delete:
-            for fp in gifs2delete:
+            for fp in vids2delete:
                 os.remove(fp)
         os.system("cd {}; bash gif2mp4.sh".format(output_dir))
     except FileNotFoundError:
