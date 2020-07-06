@@ -79,10 +79,13 @@ def convert_to_stateful(original_model):
 
 
 class Model_Evaluation():
-    def __init__(self, model_path, stateful=False):
-        self.name = os.path.split(model_path)[-1]
-        json_fp = os.path.join(model_path, self.name+".json")
-        weights_fp = os.path.join(model_path, self.name+".h5")
+    def __init__(self, model_path, fold_name=None, stateful=False, weights_ext = "h5", load_scaling=True):
+        if fold_name:
+            self.name = fold_name
+        else:
+            self.name = os.path.split(model_path)[-1]
+        json_fp = os.path.join(model_path, os.path.split(model_path)[-1]+".json")
+        weights_fp = os.path.join(model_path, self.name+"."+weights_ext)
         with open(json_fp, 'r') as json_file:
             trained_architecture = tf.keras.models.model_from_json(
                 json_file.read())
@@ -92,8 +95,12 @@ class Model_Evaluation():
             model = trained_architecture
         model.load_weights(weights_fp)
         self.model = model
-        with open(os.path.join(model_path, "scaling.pkl"), "rb") as f:
-            self.scaling = pickle.load(f)
+        if load_scaling:
+            with open(os.path.join(model_path, "scaling.pkl"), "rb") as f:
+                self.scaling = pickle.load(f)
+        else:
+            self.scaling = None
+
 
 
 class Models_Training():
@@ -137,6 +144,16 @@ class Models_Training():
         self.model.compile(**self.compile_kwargs)
         self.model.fit(**self.fit_kwargs)
         self.trained = True
+
+    def write_architecture(self):
+        if not self.trained:
+            raise Exception("Train the model first!")
+        tf.keras.utils.plot_model(self.model, os.path.join(
+            self.data_models_model_path, self.name+".png"))
+        model_json = self.model.to_json()
+        with open(os.path.join(self.data_models_model_path, self.name+".json"), "w") as json_file:
+            json_file.write(model_json)
+    
 
     def save(self):
         if not self.trained:
@@ -210,7 +227,7 @@ class Baseline1(Models_Training):
 
     def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units=TPA_DENSE_DEFAULT, **kwargs):
         vb.print_general("Initializing {} - Baseline1...".format(name))
-        vb.print_general("Model trained on {} views".format(TPA_view_IDs))
+        vb.print_general("Model will be trained on {} views".format(TPA_view_IDs))
 
         if "pretraining" in kwargs.keys():
             assert not kwargs["pretraining"]
@@ -237,7 +254,7 @@ class Baseline1(Models_Training):
         Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs,
                                  compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
 
-
+"""
 class Loss_RGB_TPA(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         self.is_placeholder = True
@@ -246,6 +263,7 @@ class Loss_RGB_TPA(tf.keras.layers.Layer):
     def call(self, inputs):
         self.add_loss(tf.abs(2000000. * tf.reduce_mean(inputs)), inputs=True)
         return inputs
+"""
 
 """
 class Baseline2(Models_Training):
@@ -301,5 +319,5 @@ class Baseline2(Models_Training):
                                  TPA_view_IDs=TPA_view_IDs, pretraining=pretraining, precompile_kwargs=precompile_kwargs, prefit_kwargs=prefit_kwargs)
 """
 
-SETUP_DIC = {"baseline1": Baseline1}
+SETUP_DIC = {"baseline1": Baseline1, Baseline1:Baseline1}
 SETUP_RGB_FLAGS = {"baseline1": False}

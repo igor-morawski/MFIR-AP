@@ -7,8 +7,12 @@ import sys
 import glob
 import numpy as np
 import tqdm
+import HTPA32x32d
+import copy
 
 DTYPE = "float32"
+VIEW_IDS = ["121", "122", "123"]
+
 
 def splitall(path):
     allparts = []
@@ -17,13 +21,14 @@ def splitall(path):
         if parts[0] == path:  # sentinel for absolute paths
             allparts.insert(0, parts[0])
             break
-        elif parts[1] == path: # sentinel for relative paths
+        elif parts[1] == path:  # sentinel for relative paths
             allparts.insert(0, parts[1])
             break
         else:
             path = parts[0]
             allparts.insert(0, parts[1])
     return allparts
+
 
 def read_txt_header(filepath: str):
     """
@@ -39,6 +44,7 @@ def read_txt_header(filepath: str):
     with open(filepath) as f:
         header = f.readline().rstrip()
     return header
+
 
 def txt2np(filepath: str, array_size: int = 32):
     """
@@ -109,16 +115,18 @@ def query_yes_no(question, default="yes"):
             sys.stdout.write("Please respond with 'yes' or 'no' "
                              "(or 'y' or 'n').\n")
 
+
 class Logger:
     def __init__(self, f):
         self.logs = []
         self.f = f
-    
+
     def log(self, msg):
         print(msg)
         self.f.write(msg+"\n")
 
-def split_into_segments(prefix, frames, relative_to, view_IDs = ["121", "122", "123"], rgb = True):
+
+def split_into_segments(prefix, frames, relative_to, view_IDs=["121", "122", "123"], rgb=True):
     """
     arguments: fp, frames, relative_to
     returns: {segment_rel_prefix: [start, end]}
@@ -142,7 +150,9 @@ def split_into_segments(prefix, frames, relative_to, view_IDs = ["121", "122", "
         end = ts_n
         return {os.path.relpath(prefix, relative_to): [start, end]}
     segs = []
-    for i in range(ts_n//frames):
+    i_range = ts_n//frames if ((ts_n/frames) -
+                               (ts_n//frames)) <= 0.75 else ts_n//frames+1
+    for i in range(i_range):
         segs.append([i*frames, (i+1)*frames])
     segs[-1] = [segs[-1][0], ts_n]
     for idx, segment in enumerate(segs):
@@ -150,6 +160,7 @@ def split_into_segments(prefix, frames, relative_to, view_IDs = ["121", "122", "
         rel_path += "{}_".format(idx)
         result[rel_path] = segment
     return result
+
 
 def get_subject_list(prefixes_list):
     src = list(prefixes_list.copy())
@@ -163,6 +174,7 @@ def get_subject_list(prefixes_list):
     result.sort()
     return result
 
+
 def sort_prefixes_by_subject(prefixes_list):
     src = list(prefixes_list.copy())
     result = {}
@@ -172,58 +184,94 @@ def sort_prefixes_by_subject(prefixes_list):
             if "subject" in chunk:
                 if chunk in result.keys():
                     result[chunk].append(f)
-                else: 
+                else:
                     result[chunk] = [f]
     return result
+
 
 if __name__ == "__main__":
     with open("aug.log", "w") as f:
         f.write("Starting...\n")
-    with open("aug.log", "a") as f:  
+    with open("aug.log", "a") as f:
         ### 1
-        logger = Logger(f)  
-        parser = argparse.ArgumentParser(description='Augment negative samples by extracting non-overlapping segments.')
+        logger = Logger(f)
+        parser = argparse.ArgumentParser(
+            description='Augment negative samples by extracting non-overlapping segments.')
         parser.add_argument('--do', action='store_true')
         parser.add_argument('--frames', type=int, required=True)
         parser.add_argument('directory', type=str, help="Labeled directory")
         args = parser.parse_args()
+        _parent, _name = os.path.split(args.directory)
+        output_directory = os.path.join(_parent, _name+"_augmented")
+        if not os.path.exists(output_directory):
+            os.mkdir(output_directory)
         ### /1
 
         ### 2
-        negative_fps = glob.glob(os.path.join(args.directory, "*", "0", "*.TXT"))
+        negative_fps = glob.glob(os.path.join(
+            args.directory, "*", "0", "*.TXT"))
         if not negative_fps:
             raise ValueError
         prefixes = list(set([fp.split("ID")[0] for fp in negative_fps]))
-        #vvvvvvvvvvvvvvvvvvvvv debug
-        #prefixes=prefixes[:5]
         segments_dict = {}
         for prefix in tqdm.tqdm(prefixes):
-            segments_dict[prefix]  = split_into_segments(prefix, frames=args.frames, relative_to=args.directory)
+            segments_dict[prefix] = split_into_segments(
+                prefix, frames=args.frames, relative_to=args.directory)
         for key in segments_dict.keys():
-            logger.log("Prefix {} split into {} segments".format(key, len(segments_dict[key])))
+            logger.log("Prefix {} split into {} segments".format(
+                key, len(segments_dict[key])))
         subjects = get_subject_list(prefixes)
         logger.log("Subjects: {}".format(", ".join(subjects)))
         prefixes_by_subject = sort_prefixes_by_subject(prefixes)
         for subject in subjects:
             segments_sum = 0
             for prefix in prefixes_by_subject[subject]:
-                segments_sum+=len(segments_dict[prefix].keys())
-            logger.log("Subject {} split into {} segments".format(subject, segments_sum))
-            
+                segments_sum += len(segments_dict[prefix].keys())
+            logger.log("Subject {} split into {} segments".format(
+                subject, segments_sum))
 
-        ### /2
-        
-       
         ### 3
         if args.do:
             print("The following actions will be performed if you continue.")
-            ans=query_yes_no("Continue?", default="no")
+            ans = query_yes_no("Continue?", default="no")
         else:
             exit(0)
         if not ans:
             exit(0)
         logger.log("Continuing...")
         ### /3
-        
-        
 
+        ### 4
+        for prefix in segments_dict.keys():
+            # load
+            tpa_fps, rgb_fp = [
+                prefix+"ID{}.TXT".format(id) for id in VIEW_IDS], prefix+"IDRGB"
+            sample = HTPA32x32d.dataset.TPA_RGB_Sample_from_filepaths(
+                tpa_fps, rgb_fp)
+            header = sample.get_header()
+            a, ts, ids = sample.TPA.arrays, sample.TPA.timestamps, sample.TPA.ids
+            for rel_fp in segments_dict[prefix].keys():
+                start, stop = segments_dict[prefix][rel_fp]
+                tpa_output_filepaths = [os.path.join(
+                    output_directory, rel_fp+"ID{}.TXT".format(id)) for id in sample.TPA.ids]
+                rgb_output_directory = os.path.join(
+                    output_directory, rel_fp+"IDRGB")
+                HTPA32x32d.tools.ensure_parent_exists(rgb_output_directory)
+                s_a, s_ts, s_ids = [array[start:stop] for array in a], [
+                    timestamps[start:stop] for timestamps in ts], ids
+                segment = HTPA32x32d.dataset.TPA_RGB_Sample_from_data(
+                    s_a, s_ts, s_ids, rgb_fp, tpa_output_filepaths, rgb_output_directory, header)
+
+                segment.RGB.timestamps = segment.RGB.timestamps[start:stop]
+                segment._update_TPA_RGB_timestamps()
+                _sample_T0_min = np.min(
+                    [ts[0] for ts in segment._TPA_RGB_timestamps])
+                _timestamps = [list(np.array(ts)-_sample_T0_min)
+                               for ts in segment._TPA_RGB_timestamps]
+                segment.TPA.timestamps = _timestamps[:-1]
+                segment.RGB.timestamps = _timestamps[-1]
+                segment._update_TPA_RGB_timestamps()
+                segment.RGB.filepaths = segment.RGB.filepaths[start:stop]
+                segment.write()
+        ### /4
+        logger.log("Success!")
