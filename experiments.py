@@ -69,6 +69,8 @@ class Model:
 class Ablation:
     def __init__(self, name, protocol, description="", models=[]):
         self.name = _return_if_obj_is_type(name, str)
+        if len(self.name.split(" ")) > 1:
+            raise ValueError("Only names that can be directory names are allowed!")
         self.protocol = _return_if_obj_is_type(protocol, int)
         if not (protocol <= len(PROTOCOLS)):
             raise ValueError
@@ -223,7 +225,7 @@ def configure_experiments(dataset_path : str):
     # 1A Model templates
     template_default_training_parameters = deepcopy(models_args_dict)
     template_default_training_parameters["batch_size"] = 16
-    template_default_training_parameters["epochs"] = 1
+    template_default_training_parameters["epochs"] = 15
     template_default_training_parameters["train_set_ratio"] = 0.7
     template_default_training_parameters["architecture"] = Baseline1
     template_default_training_parameters["loss_function"] = "exponential_loss"
@@ -290,9 +292,8 @@ def configure_experiments(dataset_path : str):
     # DEBUG
     ablations = [Ablation(name="Frame", protocol=PROTOCOL_FIXED,
                          description="Frame and frame_shift ablation", models=[modelC])]
-    ablations = [ablation1]
-    ablations = [ablation3]
-    # XXX add ablation3
+    ablations = [ablation1, ablation3]
+    ablations = [ablation1, ablation2, ablation3]
     experiment_setup = Experiment_Setup(ablations=ablations, dataset_path=dataset_path)
 
     # 4. Return
