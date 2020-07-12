@@ -6,6 +6,7 @@ import random
 import MFIRAP.d00_utils.project as project
 from tensorflow.keras import backend as K
 
+POS_LOSS_WEIGHT = 1.3
 
 class Losses_Keras:
     def __init__(self, frames, frame_shift):
@@ -15,8 +16,16 @@ class Losses_Keras:
     def get_by_name(self, name, **kwargs):
         if name == "exponential_loss":
             return self.get_exponential_loss(**kwargs)
+        if name == "early_exponential_loss":
+            return self.get_early_exponential_loss(**kwargs)
+        else:
+            raise ValueError("No such loss function!")
 
     def get_exponential_loss(self, from_logits=False):
+        E = np.exp(-(self.frames-np.arange(self.frames)-1)/(self.frames/20))
+        L = np.log(np.zeros(self.frames)+0.01)
+        weight = (L*E).sum()/L.sum()
+
         def exponential_loss(y_true, y_pred, from_logits=from_logits):
             #XXX add weight
             #XXX normalize by no of frames
@@ -41,11 +50,16 @@ class Losses_Keras:
             positive_loss = -tf.reduce_sum(tf.broadcast_to(exp, tf.shape(log_pos)) * log_pos)
             # standard cross-entropy loss
             negative_loss = -tf.reduce_sum(log_neg)
-            total_loss = positive_loss + 10*negative_loss
+            total_loss = POS_LOSS_WEIGHT*positive_loss + weight*negative_loss
             return total_loss
         return exponential_loss
 
+
     def get_early_exponential_loss(self, from_logits=False):
+        E = 1 - np.exp(np.arange(self.frames)/(self.frames))
+        L = np.log(np.zeros(self.frames)+0.01)
+        weight = (L*E).sum()/L.sum()
+
         def early_exponential_loss(y_true, y_pred, from_logits=from_logits):
             # [B, F, 2], [B, F, 2]
             # TODO ADD JAIN
@@ -63,12 +77,11 @@ class Losses_Keras:
             log_pos = (y_true)*tf.math.log(y_pred)
             log_neg = (1.0 - y_true)*tf.math.log(1.0 - y_pred)
             Y = tf.cast((tf.shape(y_true)[-1]), project.FLOATX)
-            k = tf.cast(self.frames/20, project.FLOATX)
-            exp = tf.cast(1.0 - tf.math.exp(-(Y-tf.range(Y)-1)/k), project.FLOATX)
+            exp = tf.cast(1.0 - tf.math.exp(-(tf.range(Y)-1)/Y), project.FLOATX)
             positive_loss = -tf.reduce_sum(tf.broadcast_to(exp, tf.shape(log_pos)) * log_pos)
             # standard cross-entropy loss
             negative_loss = -tf.reduce_sum(log_neg)
-            total_loss = positive_loss + negative_loss
+            total_loss = POS_LOSS_WEIGHT*positive_loss + negative_loss
             return total_loss
         return early_exponential_loss
 

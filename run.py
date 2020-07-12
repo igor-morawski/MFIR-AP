@@ -111,7 +111,7 @@ def combine(experiment_setup_obj):
     plots_dir = os.path.join(project.DATA_REPORTING_PATH, "comparison_plots")
     if not os.path.exists(plots_dir):
         os.mkdir(plots_dir)
-    
+
     plots_fps = []
     models_data_dict = {}
     rocs, det_rocs, prc, det_prc = [{} for i in range(4)]
@@ -127,19 +127,30 @@ def combine(experiment_setup_obj):
         with open(os.path.join(data_models_model_path, project.REPORT_DATA_FILE_PATTERN.format(PROTOCOL_DICT[protocol])), 'rb') as f:
             d = pickle.load(f)
         models_data_dict[(model.dict()["name"], protocol)] = d
-        models_data_dict[(model.dict()["name"], protocol)]["metrics_dict"]["name"] = model.dict()["name"]
+        models_data_dict[(model.dict()["name"], protocol)
+                         ]["metrics_dict"]["name"] = model.dict()["name"]
         # ROC, PRC, ATPC, ATRC
         if protocol == PROTOCOL_FIXED:
-            rocs[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['roc']
-            det_rocs[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['detection_roc']
-            prc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['precision_recall_curve']
-            det_prc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['detection_precision_recall_curve']
-            aptpc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['apt_precision_curve']
-            adtpc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['adt_precision_curve']
-            aptrc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['apt_recall_curve']
-            adtrc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['adt_recall_curve']
-            min_avg_ts[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['min_avg_t']
-            max_avg_ts[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()["name"], protocol)]['plots_dict']['max_avg_t']
+            rocs[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['roc']
+            det_rocs[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['detection_roc']
+            prc[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['precision_recall_curve']
+            det_prc[(model.dict()["name"], protocol)] = models_data_dict[(model.dict()[
+                "name"], protocol)]['plots_dict']['detection_precision_recall_curve']
+            aptpc[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['apt_precision_curve']
+            adtpc[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['adt_precision_curve']
+            aptrc[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['apt_recall_curve']
+            adtrc[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['adt_recall_curve']
+            min_avg_ts[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['min_avg_t']
+            max_avg_ts[(model.dict()["name"], protocol)] = models_data_dict[(
+                model.dict()["name"], protocol)]['plots_dict']['max_avg_t']
 
     # plot settings
     fontP = FontProperties()
@@ -167,36 +178,43 @@ def combine(experiment_setup_obj):
             continue
         models = ablation.models
         protocol = ablation.protocol
-        plt.title('ROC - prediction {}'.format("(ablation {})".format(ablation.name)))
+        plt.title(
+            'ROC - prediction {}'.format("(ablation {})".format(ablation.name)))
         for model in models:
             d = rocs[(model.dict()["name"], protocol)]
             fpr, tpr = d['fpr'], d['tpr']
-            plt.plot(fpr, tpr, label=model.name+", AUC = {:.2f}".format(models_data_dict[(model.dict()["name"], protocol)]["metrics_dict"]["prediction_auc"]), **plot_args)
+            plt.plot(fpr, tpr, label=model.name+", AUC = {:.2f}".format(models_data_dict[(
+                model.dict()["name"], protocol)]["metrics_dict"]["prediction_auc"]), **plot_args)
         plt.xlabel('False positive rate')
         plt.ylabel('True positive rate')
         plt.legend(**loc_args)
         set_lims()
         draw_iden_line()
-        fp = os.path.join(plots_dir, "prediction_roc{}.png".format(ablation.name))
+        fp = os.path.join(
+            plots_dir, "prediction_roc{}.png".format(ablation.name))
         plt.savefig(fp, bbox_inches='tight')
         plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
         plt.close()
-        plt.title('ROC - detection {}'.format("(ablation {})".format(ablation.name)))
+        plt.title(
+            'ROC - detection {}'.format("(ablation {})".format(ablation.name)))
         for model in models:
             d = det_rocs[(model.dict()["name"], protocol)]
             fpr, tpr = d['fpr'], d['tpr']
-            plt.plot(fpr, tpr, label=model.name+", AUC = {:.2f}".format(models_data_dict[(model.dict()["name"], protocol)]["metrics_dict"]["detection_auc"]), **plot_args)
+            plt.plot(fpr, tpr, label=model.name+", AUC = {:.2f}".format(models_data_dict[(
+                model.dict()["name"], protocol)]["metrics_dict"]["detection_auc"]), **plot_args)
             plt.xlabel('False positive rate')
             plt.ylabel('True positive rate')
             plt.legend(**loc_args)
             set_lims()
             draw_iden_line()
-            fp = os.path.join(plots_dir, "detection_roc{}.png".format(ablation.name))
+            fp = os.path.join(
+                plots_dir, "detection_roc{}.png".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
 
-            plt.title('Precision-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'Precision-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = prc[(model.dict()["name"], protocol)]
                 precision, recall = d['precision'], d['recall']
@@ -206,12 +224,14 @@ def combine(experiment_setup_obj):
             plt.legend(**loc_args)
             set_lims()
             draw_hline()
-            fp = os.path.join(plots_dir, "prediction_prc{}.png".format("(ablation {})".format(ablation.name)))
+            fp = os.path.join(plots_dir, "prediction_prc{}.png".format(
+                "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
 
-            plt.title('Precision-recall curve - detection {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'Precision-recall curve - detection {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = det_prc[(model.dict()["name"], protocol)]
                 precision, recall = d['precision'], d['recall']
@@ -221,13 +241,15 @@ def combine(experiment_setup_obj):
             plt.legend(**loc_args)
             set_lims()
             draw_hline()
-            fp = os.path.join(plots_dir, "detection_prc{}.png".format("(ablation {})".format(ablation.name)))
+            fp = os.path.join(plots_dir, "detection_prc{}.png".format(
+                "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
-        
+
             # APT-Recall
-            plt.title('APT-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'APT-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = aptrc[(model.dict()["name"], protocol)]
                 apt, recall = d['apt'], d['recall']
@@ -235,13 +257,15 @@ def combine(experiment_setup_obj):
             plt.xlabel('Recall')
             plt.ylabel('APT')
             plt.legend(**loc_args)
-            fp = os.path.join(plots_dir, "apt_recall_curve{}.png".format("(ablation {})".format(ablation.name)))
+            fp = os.path.join(plots_dir, "apt_recall_curve{}.png".format(
+                "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
-                
+
             # ADT-Recall
-            plt.title('ADT-recall curve - detection {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'ADT-recall curve - detection {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = adtrc[(model.dict()["name"], protocol)]
                 adt, recall = d['adt'], d['recall']
@@ -249,13 +273,15 @@ def combine(experiment_setup_obj):
             plt.xlabel('Recall')
             plt.ylabel('ADT')
             plt.legend(**loc_args)
-            fp = os.path.join(plots_dir, "adt_recall_curve{}.png".format(ablation.name))
+            fp = os.path.join(
+                plots_dir, "adt_recall_curve{}.png".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
-        
+
             # APT-Precision
-            plt.title('APT-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'APT-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = aptpc[(model.dict()["name"], protocol)]
                 apt, precision = d['apt'], d['precision']
@@ -263,13 +289,15 @@ def combine(experiment_setup_obj):
             plt.xlabel('Precision')
             plt.ylabel('APT')
             plt.legend(**loc_args)
-            fp = os.path.join(plots_dir, "apt_precision_curve{}.png".format(ablation.name))
+            fp = os.path.join(
+                plots_dir, "apt_precision_curve{}.png".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
-                
+
             # ADT-Precision
-            plt.title('ADT-precision curve - detection {}'.format("(ablation {})".format(ablation.name)))
+            plt.title(
+                'ADT-precision curve - detection {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = adtpc[(model.dict()["name"], protocol)]
                 adt, precision = d['adt'], d['precision']
@@ -277,14 +305,16 @@ def combine(experiment_setup_obj):
             plt.xlabel('Precision')
             plt.ylabel('ADT')
             plt.legend(**loc_args)
-            fp = os.path.join(plots_dir, "adt_precision_curve{}.png".format(ablation.name))
+            fp = os.path.join(
+                plots_dir, "adt_precision_curve{}.png".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
         plots_fps = list(set(plots_fps))
         _plots_fps = plots_fps.copy()
         excluded_plots = ["adt", "detection"]
-        plots_fps = list(filter(lambda x: all([e not in x for e in excluded_plots]), _plots_fps))
+        plots_fps = list(filter(lambda x: all(
+            [e not in x for e in excluded_plots]), _plots_fps))
         plots_fps.sort()
     # /plots
 
@@ -292,7 +322,8 @@ def combine(experiment_setup_obj):
     plots_html = str(
         "".join(['''<img src="{}"><br>Figure {}<br>'''.format(e, i) for i, e in enumerate(plots_fps)]))
     report_data["plots_html"] = plots_html
-    links_html = str("".join(['''<li> <a href="{}">{}</a></li>'''.format(os.path.relpath(os.path.join(project.DATA_REPORTING_PATH, model.dict()["name"], PROTOCOL_DICT[protocol]+".html"), project.DATA_REPORTING_PATH),  model.dict()["name"]) for (model, protocol) in experiment_setup_obj.model_protocol_pairs]))
+    links_html = str("".join(['''<li> <a href="{}">{}</a></li>'''.format(os.path.relpath(os.path.join(project.DATA_REPORTING_PATH, model.dict()["name"],
+                                                                                                      PROTOCOL_DICT[protocol]+".html"), project.DATA_REPORTING_PATH),  model.dict()["name"]) for (model, protocol) in experiment_setup_obj.model_protocol_pairs]))
     report_data["links_html"] = links_html
 
     sortable_header_keys = ['name', 'APT', 'ATTA',  'precision', 'recall',
@@ -303,11 +334,18 @@ def combine(experiment_setup_obj):
     metric_cell_pattern = cell_pattern.format("{:.3f}")
     header_cell_pattern = "<th>{}</th>"
 
-    def cell_formatter(x):
+    def cell_formatter(v):
+        if v == np.NaN:
+            x = -1
+        elif str(v) == str(np.NaN):
+            x = -1
+        else:
+            x = v
         try:
             return metric_cell_pattern.format(x)
         except ValueError:
             return cell_pattern.format(x)
+
     sortable_header = "".join(header_cell_pattern.format(h)
                               for h in sortable_header_keys)
     sortable_table_content = "".join([(row_pattern.format("".join(cell_formatter(
@@ -334,7 +372,8 @@ def combine(experiment_setup_obj):
     '''
     report_data["terminology_html"] = terminology_html
 
-    ablations_list_html = "".join("<li>{} - {}</li>".format(ablation.name, ablation.description) for ablation in experiment_setup_obj.ablations)
+    ablations_list_html = "".join("<li>{} - {}</li>".format(ablation.name,
+                                                            ablation.description) for ablation in experiment_setup_obj.ablations)
     dataset_and_ablations_html = '''
     <h2>Appendix B. Dataset and ablation variations.</h2>
     <ul>
@@ -422,10 +461,9 @@ def combine(experiment_setup_obj):
                     padding: 10px;
                 }}
             </style>
-
         </head>
+        
         <body>
-
             <h1>Evaluation report: models comparison</h1>
             {sortable_html}
             {links_html}
@@ -438,16 +476,16 @@ def combine(experiment_setup_obj):
     '''.format(**report_data)
     with open(os.path.join(project.DATA_REPORTING_PATH, "comparison.html"), 'w') as f:
         f.write(report_html)
-    return True 
+    return True
 
 
 def get_model_metrics(testing_results_dict):
-    prefixes = testing_results_dict["prefixes"] 
-    sample_classes_dict = testing_results_dict["sample_classes_dict"] 
+    prefixes = testing_results_dict["prefixes"]
+    sample_classes_dict = testing_results_dict["sample_classes_dict"]
     labels_dict = testing_results_dict["labels_dict"]
-    predictions_dict = testing_results_dict["predictions_dict"]  
-    timestamps_dict = testing_results_dict["timestamps_dict"]  
-    optimal_threshold = testing_results_dict["optimal_threshold"] 
+    predictions_dict = testing_results_dict["predictions_dict"]
+    timestamps_dict = testing_results_dict["timestamps_dict"]
+    optimal_threshold = testing_results_dict["optimal_threshold"]
     # Metrics:
     # Calculated in this step: TP, TN, FP, FN, TT_sum, DTP, DTN, DFP, DFN < D = detection
     # ANTICIPATION
@@ -551,7 +589,7 @@ def get_model_metrics(testing_results_dict):
     arc_atta_det, arc_recall_det, arc_threshold_det = plots.detection_atta_recall_curve(
         labels_dict, predictions_dict, timestamps_dict)
     plots_dict["apt_recall_curve"] = {"apt": arc_atta_pre,
-                         "recall": arc_recall_pre, "thresholds": arc_threshold_pre}
+                                      "recall": arc_recall_pre, "thresholds": arc_threshold_pre}
     plots_dict["adt_recall_curve"] = {
         "adt": arc_atta_det, "recall": arc_recall_det, "thresholds": arc_threshold_det}
 
@@ -561,13 +599,13 @@ def get_model_metrics(testing_results_dict):
     apc_atta_det, apc_precision_det, apc_threshold_det = plots.detection_atta_precision_curve(
         labels_dict, predictions_dict, timestamps_dict)
     plots_dict["apt_precision_curve"] = {"apt": apc_atta_pre,
-                         "precision": apc_precision_pre, "thresholds": apc_threshold_pre}
+                                         "precision": apc_precision_pre, "thresholds": apc_threshold_pre}
     plots_dict["adt_precision_curve"] = {
         "adt": apc_atta_det, "precision": apc_precision_det, "thresholds": apc_threshold_det}
 
-    min_avg_t, max_avg_t = plots.compute_max_min_average_time_bounds(labels_dict, timestamps_dict) 
-    plots_dict['min_avg_t'], plots_dict['max_avg_t'] =  min_avg_t, max_avg_t
-
+    min_avg_t, max_avg_t = plots.compute_max_min_average_time_bounds(
+        labels_dict, timestamps_dict)
+    plots_dict['min_avg_t'], plots_dict['max_avg_t'] = min_avg_t, max_avg_t
 
     data_dict = {"name": testing_results_dict["name"],
                  "metrics_dict": metrics_dict, "plots_dict": plots_dict, "testing_results_dict": testing_results_dict}
@@ -578,32 +616,33 @@ def combine_all_metrics(all_metrics_dict_list):
     result = {}
     sum_dict = {}
     sum_keys = ["ATTA", "APT",
-                    "precision", "recall",
-                    "accuracy",
-                    "detection_precision", "detection_recall",
-                    "detection_accuracy",
-                    "TP", "TN", "FP", "FN",
-                    "DTP", "DTN", "DFP", "DFN"]
+                "precision", "recall",
+                "accuracy",
+                "detection_precision", "detection_recall",
+                "detection_accuracy",
+                "TP", "TN", "FP", "FN",
+                "DTP", "DTN", "DFP", "DFN"]
     for key in sum_keys:
         sum_dict[key] = 0
     for data_dict in all_metrics_dict_list:
         metrics_dict = data_dict["metrics_dict"].copy()
         plots_dict = data_dict["plots_dict"].copy()
         name = data_dict["name"]
-        testing_results_dict= data_dict["testing_results_dict"].copy()
-        prefixes = testing_results_dict["prefixes"] 
-        sample_classes_dict = testing_results_dict["sample_classes_dict"].copy()
+        testing_results_dict = data_dict["testing_results_dict"].copy()
+        prefixes = testing_results_dict["prefixes"]
+        sample_classes_dict = testing_results_dict["sample_classes_dict"].copy(
+        )
         labels_dict = testing_results_dict["labels_dict"].copy()
-        predictions_dict = testing_results_dict["predictions_dict"].copy()  
+        predictions_dict = testing_results_dict["predictions_dict"].copy()
         timestamps_dict = testing_results_dict["timestamps_dict"].copy()
         optimal_threshold = testing_results_dict["optimal_threshold"]
         for key in sum_keys:
             sum_dict[key] += metrics_dict[key]
     comp_avg_keys = ["ATTA", "APT",
-                    "precision", "recall",
-                    "accuracy",
-                    "detection_precision", "detection_recall",
-                    "detection_accuracy"]
+                     "precision", "recall",
+                     "accuracy",
+                     "detection_precision", "detection_recall",
+                     "detection_accuracy"]
     for key in comp_avg_keys:
         sum_dict[key] /= len(all_metrics_dict_list)
     result["plots_dict"] = ["Not implemented"]
@@ -617,7 +656,8 @@ def combine_all_metrics(all_metrics_dict_list):
     result["testing_results_dict"]["predictions_dict"] = ["Not implemented"]
     result["testing_results_dict"]["timestamps_dict"] = ["Not implemented"]
     result["testing_results_dict"]["prefixes"] = []
-    [result["testing_results_dict"]["prefixes"].extend(data_dict["testing_results_dict"]["prefixes"]) for data_dict in all_metrics_dict_list]
+    [result["testing_results_dict"]["prefixes"].extend(
+        data_dict["testing_results_dict"]["prefixes"]) for data_dict in all_metrics_dict_list]
     result["name"] = name
     return result
 
@@ -626,11 +666,11 @@ def generate_report_html_data(data_dict, model_dict):
     metrics_dict = data_dict["metrics_dict"].copy()
     plots_dict = data_dict["plots_dict"].copy()
     name = data_dict["name"]
-    testing_results_dict= data_dict["testing_results_dict"].copy()
-    prefixes = testing_results_dict["prefixes"] 
+    testing_results_dict = data_dict["testing_results_dict"].copy()
+    prefixes = testing_results_dict["prefixes"]
     sample_classes_dict = testing_results_dict["sample_classes_dict"].copy()
     labels_dict = testing_results_dict["labels_dict"].copy()
-    predictions_dict = testing_results_dict["predictions_dict"].copy()  
+    predictions_dict = testing_results_dict["predictions_dict"].copy()
     timestamps_dict = testing_results_dict["timestamps_dict"].copy()
     optimal_threshold = testing_results_dict["optimal_threshold"]
     DTP, DFN, DTN, DFP = metrics_dict["DTP"], metrics_dict["DFN"], metrics_dict["DTN"], metrics_dict["DFP"]
@@ -641,8 +681,8 @@ def generate_report_html_data(data_dict, model_dict):
     summary_dict["train_size"] = model_dict["train_set_ratio"]
     summary_dict["loss_function"] = model_dict["loss_function"]
     summary_dict["frames"] = model_dict["frames"]
-    summary_dict["frame_shift"] = model_dict["frame_shift"]   
-    summary_dict["view_IDs"] = model_dict["view_IDs"]   
+    summary_dict["frame_shift"] = model_dict["frame_shift"]
+    summary_dict["view_IDs"] = model_dict["view_IDs"]
     summary = '''
     <table>
     <thead>
@@ -789,7 +829,7 @@ def generate_report_html_data(data_dict, model_dict):
     dt = datetime.datetime.now()
     report_data = {"summary": summary, "date": dt.date(), "time": dt.time(), "optimal_threshold": optimal_threshold,
                    "cfs_table": cfs_table, "metrics_table": metrics_table, "samples_n": len(prefixes), "pos_n": DTP+DFN, "neg_n": DTN + DFP}
-    
+
     report_html = '''
     <html>
         <head>
@@ -852,7 +892,7 @@ def generate_report_html_data(data_dict, model_dict):
         </body>
     </html> 
     '''.format(**report_data, name=name)
-    return report_html 
+    return report_html
 
 
 def report(experiment_setup_obj):
@@ -870,21 +910,23 @@ def report(experiment_setup_obj):
         model_dir = os.path.join(project.DATA_MODELS_PATH, model_dict["name"])
         if not os.path.exists(model_dir):
             raise FileNotFoundError
-        if protocol == PROTOCOL_FIXED:   
+        if protocol == PROTOCOL_FIXED:
             folds_metrics = []
-            testing_subject_folds = [dataset_manager.dataset_testing_subj]     
+            testing_subject_folds = [dataset_manager.dataset_testing_subj]
             assert len(testing_subject_folds) == 1
             for testing_fold in testing_subject_folds:
                 fold_name = _get_fn_included_subj(model_dict, testing_fold)
                 if not os.path.exists(os.path.join(data_models_model_path,
-                                    project.TESTING_RESULTS_FILE_PATTERN.format(fold_name))):
+                                                   project.TESTING_RESULTS_FILE_PATTERN.format(fold_name))):
                     raise FileNotFoundError
                 testing_subject_folds = [dataset_manager.dataset_testing_subj]
                 # in protocol fixed there is only one fold so no need for any looping or compiling, just renaming
                 with open(os.path.join(data_models_model_path, project.TESTING_RESULTS_FILE_PATTERN.format(fold_name)), "rb") as f:
                     data = pickle.load(f)
-                data["name"] = "{}_{}".format(model_dict['name'], PROTOCOL_DICT[protocol])
-                assert set(data.keys()) == set(project.TESTING_RESULTS_DICT_KEYS)
+                data["name"] = "{}_{}".format(
+                    model_dict['name'], PROTOCOL_DICT[protocol])
+                assert set(data.keys()) == set(
+                    project.TESTING_RESULTS_DICT_KEYS)
                 data["protocol"] = protocol
             # Get metrics and plots
             print("Getting report data for {}, protocol {} ({})...".format(
@@ -903,12 +945,14 @@ def report(experiment_setup_obj):
                 assert len(testing_subject_folds) != 1
                 fold_name = _get_fn_included_subj(model_dict, testing_fold)
                 if not os.path.exists(os.path.join(data_models_model_path,
-                                    project.TESTING_RESULTS_FILE_PATTERN.format(fold_name))):
+                                                   project.TESTING_RESULTS_FILE_PATTERN.format(fold_name))):
                     raise FileNotFoundError
                 with open(os.path.join(data_models_model_path, project.TESTING_RESULTS_FILE_PATTERN.format(fold_name)), "rb") as f:
                     data = pickle.load(f)
-                data["name"] = "{}_{}".format(model_dict['name'], PROTOCOL_DICT[protocol])
-                assert set(data.keys()) == set(project.TESTING_RESULTS_DICT_KEYS)
+                data["name"] = "{}_{}".format(
+                    model_dict['name'], PROTOCOL_DICT[protocol])
+                assert set(data.keys()) == set(
+                    project.TESTING_RESULTS_DICT_KEYS)
                 data["protocol"] = protocol
                 all_metrics.append(get_model_metrics(data.copy()))
             model_metrics = combine_all_metrics(all_metrics)
@@ -1017,7 +1061,7 @@ def test(experiment_setup_obj):
             else:
                 print("Skipping model {}, use a flag to retest or delete files manually if necessery.".format(
                     fold_name))
-    return True  
+    return True
 
 
 def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj, mu, sigma):
@@ -1037,7 +1081,7 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
                   Recall_AP(), PrecisionAtRecall_AP(0.8)]
     fp_hdf5 = os.path.join(model_dir, fold_name+".hdf5")
     mcp = ModelCheckpoint(fp_hdf5, monitor='val_loss', verbose=True,
-                          save_best_only=True, save_weights_only=True)
+                          save_best_only=False, save_weights_only=True)
     metrics = ap_metrics
     callbacks = [mcp]
     optimizer = "adam"
@@ -1051,6 +1095,7 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
     setup = Setup(name=model_dict["name"], compile_kwargs=compile_kwargs, fit_kwargs=fit_kwargs,
                   TPA_view_IDs=model_dict['view_IDs'])
     # setup.delete_existing_model_data_and_output()
+    print(setup.model.summary())
     setup.train()
     setup.write_architecture()
     # setup.plot_metrics(plot_val_metrics=valid_gen)
@@ -1127,17 +1172,18 @@ if __name__ == "__main__":
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--report', action='store_true')
     parser.add_argument('--combine', action='store_true')
+    parser.add_argument('--all', action='store_true')
     FLAGS = parser.parse_args()
     experiment_setup = configure_experiments(
         dataset_path="/media/igor/DATA/D01_MFIR-AP-Dataset")
     experiment_setup.print_summary()
     model = experiment_setup.models[0]
     model_dict = model.dict()
-    if FLAGS.train:
+    if FLAGS.train or FLAGS.all:
         train(experiment_setup)
-    if FLAGS.test:
+    if FLAGS.test or FLAGS.all:
         test(experiment_setup)
-    if FLAGS.report:
+    if FLAGS.report or FLAGS.all:
         report(experiment_setup)
-    if FLAGS.combine:
+    if FLAGS.combine or FLAGS.all:
         combine(experiment_setup)

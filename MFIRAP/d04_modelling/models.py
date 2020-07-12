@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, TimeDistributed, Activation, Lambda
-from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, AvgPool2D
 from tensorflow.keras.layers import Concatenate, Subtract, Multiply
 from tensorflow.keras.layers import GRU as RNN
 from tensorflow.keras.models import model_from_json
@@ -25,7 +25,7 @@ FLOATX = 'float32'
 TPA_DENSE_DEFAULT = 1024 // 10
 tf.keras.backend.set_image_data_format('channels_last')
 
-def _build_TPA_embedding(view_id, dense_units):
+def _build_TPA_embedding(view_id, dense_units, block1 = None):
     # VGG-16 but dims are scaled by 1/7, only 3 blocks
     # FUTURE Think about filters -> skipping cncnts
     # https://towardsdatascience.com/step-by-step-vgg16-implementation-in-keras-for-beginners-a833c686ae6c
@@ -34,12 +34,15 @@ def _build_TPA_embedding(view_id, dense_units):
     embedding_input = Input(
         shape=(None, *project.TPA_FRAME_SHAPE), name='TPA{}_input'.format(view_id))
     # block1
-    b1c1 = TimeDistributed(Conv2D(filters=64, kernel_size=(
-        3, 3), padding="same", activation="relu"), name='TPA{}_b1c1'.format(view_id))(embedding_input)
-    b1c2 = TimeDistributed(Conv2D(filters=64, kernel_size=(
-        3, 3), padding="same", activation="relu"), name='TPA{}_b1c2'.format(view_id))(b1c1)
-    b1c3 = TimeDistributed(Conv2D(filters=64, kernel_size=(
-        3, 3), padding="same", activation="relu"), name='TPA{}_b1c3'.format(view_id))(b1c2)
+    if not block1:
+        b1c1 = TimeDistributed(Conv2D(filters=64, kernel_size=(
+            3, 3), padding="same", activation="relu"), name='TPA{}_b1c1'.format(view_id))(embedding_input)
+        b1c2 = TimeDistributed(Conv2D(filters=64, kernel_size=(
+            3, 3), padding="same", activation="relu"), name='TPA{}_b1c2'.format(view_id))(b1c1)
+        b1c3 = TimeDistributed(Conv2D(filters=64, kernel_size=(
+            3, 3), padding="same", activation="relu"), name='TPA{}_b1c3'.format(view_id))(b1c2)
+    else:
+        b1c3 = block1(embedding_input)
     # block2
     b2m1 = TimeDistributed(MaxPool2D(pool_size=(2, 2), strides=(
         2, 2)), name='TPA{}_b2m1'.format(view_id))(b1c3)
@@ -254,30 +257,20 @@ class Baseline1(Models_Training):
         Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs,
                                  compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
 
-"""
-class Loss_RGB_TPA(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        self.is_placeholder = True
-        super(Loss_RGB_TPA, self).__init__(**kwargs)
 
-    def call(self, inputs):
-        self.add_loss(tf.abs(2000000. * tf.reduce_mean(inputs)), inputs=True)
-        return inputs
-"""
 
-"""
-class Baseline2(Models_Training):
+class Downsampled16(Models_Training):
     '''
-    CNN -> RGB PI PRETRAINED,
     TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
     '''
 
-    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, pretraining, precompile_kwargs=None, prefit_kwargs=None, TPA_dense_units=TPA_DENSE_DEFAULT, **kwargs):
-        vb.print_general("Initializing Baseline1...")
+    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units=TPA_DENSE_DEFAULT, **kwargs):
+        vb.print_general("Initializing {} - Baseline1...".format(name))
+        vb.print_general("Model will be trained on {} views".format(TPA_view_IDs))
 
-        assert pretraining
-
-        io_TPAs = [_build_TPA_embedding(id, TPA_dense_units)
+        def downsampling(tpa_view_id):
+            return TimeDistributed(AvgPool2D(pool_size=(2, 2), strides=None), name='TPA{}_'.format(tpa_view_id))
+        io_TPAs = [_build_TPA_embedding(id, TPA_dense_units, block1=downsampling(id))
                    for id in TPA_view_IDs]
         i_TPAs = [x[0] for x in io_TPAs]
         o_TPAs = [x[1] for x in io_TPAs]
@@ -287,19 +280,39 @@ class Baseline2(Models_Training):
         if len(TPA_view_IDs) == 1:
             TPA_merged = [*o_TPAs]
 
-        rgb_dim = fit_kwargs["x"][0][0][-1].shape[-1]
-        i_RGB = Input(shape=(None, rgb_dim), name=RGB_FEATURES_LAYER_NAME)
-        flat = TimeDistributed(Flatten())(i_RGB)
-        RGB_TPA_dense = TimeDistributed(
-            Dense(units=TPA_dense_units, activation="relu"))(flat)
-        RGB_dense = TimeDistributed(
-            Dense(project.N_CLASSES, activation=None))(RGB_TPA_dense)
-        RGB_classification = Activation(
-            activation='sigmoid', name='RGB_classification')(RGB_dense)
+        rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh',
+                  recurrent_activation='sigmoid', return_sequences=True, name="TPA_GRU")(TPA_merged)
+        TPA_dense = TimeDistributed(
+            Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
+        TPA_classification = Activation(
+            activation='softmax', name='TPA_classification')(TPA_dense)
+        model = Model(i_TPAs, TPA_classification,
+                      name="Model_{}xTPA".format(len(TPA_view_IDs)))
 
-        RGB_TPA_diff = [Subtract(name="Diff{}".format(id))(
-            [RGB_TPA_dense, o_TPA]) for id, o_TPA in zip(TPA_view_IDs, o_TPAs)]
-        loss = Loss_RGB_TPA()(RGB_TPA_diff)
+        Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs,
+                                 compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
+
+
+class Downsampled8(Models_Training):
+    '''
+    TimeDistributed(classification(rnn(view_pooling(TPA x 3)))
+    '''
+
+    def __init__(self, fit_kwargs, compile_kwargs, name, TPA_view_IDs, TPA_dense_units=TPA_DENSE_DEFAULT, **kwargs):
+        vb.print_general("Initializing {} - Baseline1...".format(name))
+        vb.print_general("Model will be trained on {} views".format(TPA_view_IDs))
+
+        def downsampling(tpa_view_id):
+            return TimeDistributed(AvgPool2D(pool_size=(4, 4), strides=None), name='TPA{}_'.format(tpa_view_id))
+        io_TPAs = [_build_TPA_embedding(id, TPA_dense_units, block1=downsampling(id))
+                   for id in TPA_view_IDs]
+        i_TPAs = [x[0] for x in io_TPAs]
+        o_TPAs = [x[1] for x in io_TPAs]
+
+        if len(TPA_view_IDs) > 1:
+            TPA_merged = Concatenate(name='view_concat', axis=-1)([*o_TPAs])
+        if len(TPA_view_IDs) == 1:
+            TPA_merged = [*o_TPAs]
 
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh',
                   recurrent_activation='sigmoid', return_sequences=True, name="TPA_GRU")(TPA_merged)
@@ -307,17 +320,11 @@ class Baseline2(Models_Training):
             Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
         TPA_classification = Activation(
             activation='softmax', name='TPA_classification')(TPA_dense)
+        model = Model(i_TPAs, TPA_classification,
+                      name="Model_{}xTPA".format(len(TPA_view_IDs)))
 
-        model = Model(i_TPAs + [i_RGB], [loss, RGB_classification],
-                      name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
-        model = Model(i_TPAs + [i_RGB], TPA_classification,
-                      name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
-        model = Model(
-            i_TPAs + [i_RGB], loss, name="Model_{}xTPA_RGB_PI".format(len(TPA_view_IDs)))
+        Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs,
+                                 compile_kwargs=compile_kwargs, TPA_view_IDs=TPA_view_IDs)
 
-        Models_Training.__init__(self, name=name, model=model, fit_kwargs=fit_kwargs, compile_kwargs=compile_kwargs,
-                                 TPA_view_IDs=TPA_view_IDs, pretraining=pretraining, precompile_kwargs=precompile_kwargs, prefit_kwargs=prefit_kwargs)
-"""
-
-SETUP_DIC = {"baseline1": Baseline1, Baseline1:Baseline1}
+SETUP_DIC = {"baseline1": Baseline1, Baseline1:Baseline1, Downsampled16:Downsampled16, Downsampled8:Downsampled8}
 SETUP_RGB_FLAGS = {"baseline1": False}

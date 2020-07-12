@@ -54,10 +54,9 @@
                     padding: 10px;
                 }
             </style>
-
         </head>
+        
         <body>
-
             <h1>Evaluation report: models comparison</h1>
             
     <table class="sortable" width="100%">
@@ -65,13 +64,13 @@
     <tr><th>name</th><th>APT</th><th>ATTA</th><th>precision</th><th>recall</th><th>accuracy</th><th>detection precision</th><th>detection recall</th><th>detection accuracy</th><th>prediction auc</th><th>detection auc</th></tr>
     </thead>
     <tbody>
-    <tr><td width="9%">modelA</td><td width="9%">9.390</td><td width="9%">9.077</td><td width="9%">0.946</td><td width="9%">0.967</td><td width="9%">0.956</td><td width="9%">0.947</td><td width="9%">1.000</td><td width="9%">0.972</td><td width="9%">0.992</td><td width="9%">1.000</td></tr><tr><td width="9%">modelB</td><td width="9%">8.696</td><td width="9%">8.406</td><td width="9%">0.967</td><td width="9%">0.967</td><td width="9%">0.967</td><td width="9%">0.968</td><td width="9%">1.000</td><td width="9%">0.983</td><td width="9%">0.995</td><td width="9%">1.000</td></tr><tr><td width="9%">modelC</td><td width="9%">7.232</td><td width="9%">6.590</td><td width="9%">0.976</td><td width="9%">0.911</td><td width="9%">0.944</td><td width="9%">0.978</td><td width="9%">1.000</td><td width="9%">0.989</td><td width="9%">0.985</td><td width="9%">1.000</td></tr><tr><td width="9%">modelD</td><td width="9%">6.189</td><td width="9%">5.295</td><td width="9%">0.987</td><td width="9%">0.856</td><td width="9%">0.922</td><td width="9%">0.989</td><td width="9%">1.000</td><td width="9%">0.994</td><td width="9%">0.988</td><td width="9%">1.000</td></tr><tr><td width="9%">model_c</td><td width="9%">6.811</td><td width="9%">5.524</td><td width="9%">0.986</td><td width="9%">0.811</td><td width="9%">0.900</td><td width="9%">0.989</td><td width="9%">1.000</td><td width="9%">0.994</td><td width="9%">0.969</td><td width="9%">1.000</td></tr><tr><td width="9%">model_r</td><td width="9%">9.746</td><td width="9%">9.421</td><td width="9%">0.906</td><td width="9%">0.967</td><td width="9%">0.933</td><td width="9%">0.909</td><td width="9%">1.000</td><td width="9%">0.950</td><td width="9%">0.987</td><td width="9%">1.000</td></tr><tr><td width="9%">model_cr</td><td width="9%">8.338</td><td width="9%">7.412</td><td width="9%">0.941</td><td width="9%">0.889</td><td width="9%">0.917</td><td width="9%">0.947</td><td width="9%">1.000</td><td width="9%">0.972</td><td width="9%">0.972</td><td width="9%">1.000</td></tr><tr><td width="9%">model_rl</td><td width="9%">8.633</td><td width="9%">7.866</td><td width="9%">0.965</td><td width="9%">0.911</td><td width="9%">0.939</td><td width="9%">0.968</td><td width="9%">1.000</td><td width="9%">0.983</td><td width="9%">0.986</td><td width="9%">1.000</td></tr><tr><td width="9%">modelC</td><td width="9%">9.266</td><td width="9%">8.730</td><td width="9%">0.901</td><td width="9%">0.922</td><td width="9%">0.903</td><td width="9%">0.904</td><td width="9%">1.000</td><td width="9%">0.942</td><td width="9%">nan</td><td width="9%">nan</td></tr>
+    <tr><td width="9%">modelA</td><td width="9%">6.398</td><td width="9%">5.918</td><td width="9%">0.991</td><td width="9%">0.925</td><td width="9%">0.958</td><td width="9%">0.992</td><td width="9%">1.000</td><td width="9%">0.996</td><td width="9%">0.994</td><td width="9%">1.000</td></tr>
     </tbody>
     </table>
     
-            <li> <a href="modelA/FIXED_SPLIT.html">modelA</a></li><li> <a href="modelB/FIXED_SPLIT.html">modelB</a></li><li> <a href="modelC/FIXED_SPLIT.html">modelC</a></li><li> <a href="modelD/FIXED_SPLIT.html">modelD</a></li><li> <a href="model_c/FIXED_SPLIT.html">model_c</a></li><li> <a href="model_r/FIXED_SPLIT.html">model_r</a></li><li> <a href="model_cr/FIXED_SPLIT.html">model_cr</a></li><li> <a href="model_rl/FIXED_SPLIT.html">model_rl</a></li><li> <a href="modelC/CROSS_SUBJECT.html">modelC</a></li>
+            <li> <a href="modelA/FIXED_SPLIT.html">modelA</a></li>
             <br>
-            <img src="comparison_plots/apt_precision_curveFrame.png"><br>Figure 0<br><img src="comparison_plots/apt_precision_curveView.png"><br>Figure 1<br><img src="comparison_plots/apt_recall_curve(ablation Frame).png"><br>Figure 2<br><img src="comparison_plots/apt_recall_curve(ablation View).png"><br>Figure 3<br><img src="comparison_plots/prediction_prc(ablation Frame).png"><br>Figure 4<br><img src="comparison_plots/prediction_prc(ablation View).png"><br>Figure 5<br><img src="comparison_plots/prediction_rocFrame.png"><br>Figure 6<br><img src="comparison_plots/prediction_rocView.png"><br>Figure 7<br>
+            <img src="comparison_plots/apt_precision_curveFrame.png"><br>Figure 0<br><img src="comparison_plots/apt_recall_curve(ablation Frame).png"><br>Figure 1<br><img src="comparison_plots/prediction_prc(ablation Frame).png"><br>Figure 2<br><img src="comparison_plots/prediction_rocFrame.png"><br>Figure 3<br>
             
     <hr>
     <h2>Appendix A. Metrics and terms.</h2>
@@ -104,7 +103,7 @@
             </ul>
     </ul>
     <h3>Ablations</h3>
-    <li>Frame - Frame and frame_shift ablation</li><li>View - View ablation</li><li>Final - Final results on cross-subject</li>
+    <li>Frame - Frame and frame_shift ablation</li>
     
         </body>
     </html> 

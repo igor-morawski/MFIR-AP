@@ -9,14 +9,19 @@ from copy import deepcopy
 import HTPA32x32d
 
 from MFIRAP.d04_modelling.models import Models_Training
+from MFIRAP.d04_modelling.models import Baseline1, Downsampled16, Downsampled8
 
 PROTOCOL_FIXED = 0
 PROTOCOL_CROSS_SUBJ = 1
 PROTOCOLS = [PROTOCOL_FIXED, PROTOCOL_CROSS_SUBJ]
 PROTOCOL_DICT = {PROTOCOL_FIXED:"FIXED_SPLIT", PROTOCOL_CROSS_SUBJ:"CROSS_SUBJECT"}
+"""
+# old split 
 DEVELOPMENT_SUBJ_L = ["subject1", "subject2", "subject3", "subject4", "subject5", "subject6", "subject7", "subject8", "subject9"]
 TESTING_SUBJ_L = ["subject10", "subject11", "subject12"]
-
+"""
+DEVELOPMENT_SUBJ_L = ["subject1", "subject2", "subject3", "subject4", "subject5", "subject6", "subject7", "subject8"]
+TESTING_SUBJ_L = ["subject9", "subject10", "subject11", "subject12"]
 def _return_if_obj_is_type(obj, type_expected):
     if not isinstance(obj, type_expected):
         raise TypeError("Expected {}, got {}.".format(
@@ -34,7 +39,7 @@ def _assert_obj_is_type(obj, type_expected):
 
 
 class Model:
-    def __init__(self, name, frames, frame_shift, loss_function, train_set_ratio, batch_size, view_IDs, epochs, architecture):
+    def __init__(self, name, frames, frame_shift, loss_function, train_set_ratio, batch_size, view_IDs, epochs, architecture, affine_transform=None):
         self.name = _return_if_obj_is_type(name, str)
         self.frames = _return_if_obj_is_type(frames, int)
         self.frame_shift = _return_if_obj_is_type(frame_shift, int)
@@ -51,6 +56,11 @@ class Model:
                 raise ValueError
         self.architecture = _return_if_obj_is_type(
             architecture, type(type))
+        if affine_transform: 
+            self.affine_transform = _return_if_obj_is_type(affine_transform, bool)
+        else: 
+            self.affine_transform = False
+        
 
     def dict(self):
         result = {}
@@ -63,6 +73,7 @@ class Model:
         result["view_IDs"] = self.view_IDs
         result["epochs"] = self.epochs
         result["architecture"] = self.architecture
+        result["affine_transform"] = self.affine_transform
         return result
 
 
@@ -111,6 +122,7 @@ class Dataset_Manager:
         # get all the subjects
         _unfiltered_subj_l = [p if os.path.isdir(p) else None for p in glob.glob(os.path.join(self.dataset_path, "*"))]
         subj_l = [os.path.relpath(p, self.dataset_path) for p in list(filter(None, _unfiltered_subj_l))]
+        subj_l = list((set(DEVELOPMENT_SUBJ_L) | set(TESTING_SUBJ_L)) & set(subj_l))
         self.subjects_relpaths = subj_l.copy()
         self.subjects_relpaths.sort()
         self.subjects = self.subjects_relpaths.copy()
@@ -213,7 +225,6 @@ def configure_experiments(dataset_path : str):
 
     Models >> Ablations >> Experiment Setup >> Setup Compilation
     """
-    from MFIRAP.d04_modelling.models import Baseline1
 
     models_args = inspect.getargspec(Model).args
     models_args_dict = dict.fromkeys(models_args)
@@ -226,7 +237,7 @@ def configure_experiments(dataset_path : str):
     template_default_training_parameters = deepcopy(models_args_dict)
     template_default_training_parameters["batch_size"] = 16
     template_default_training_parameters["epochs"] = 15
-    template_default_training_parameters["train_set_ratio"] = 0.7
+    template_default_training_parameters["train_set_ratio"] = 0.8
     template_default_training_parameters["architecture"] = Baseline1
     template_default_training_parameters["loss_function"] = "exponential_loss"
 
@@ -257,8 +268,8 @@ def configure_experiments(dataset_path : str):
     modelD = Model(**modelD_dict)
     modelsABCD = [modelA, modelB, modelC, modelD]
     # ii
-    template_view_abl = deepcopy(modelD_dict)  # just like D
-    model_rlc = modelD  # alias for D
+    template_view_abl = deepcopy(modelC_dict)  # just like C
+    model_rlc = modelC  # alias for D
     model_c_dict = deepcopy(template_view_abl)
     model_c_dict["name"] = "model_c"
     model_c_dict["view_IDs"] = ["121"]
@@ -277,7 +288,24 @@ def configure_experiments(dataset_path : str):
     model_rl = Model(**model_rl_dict)
     modelsVIEWS = [model_c, model_r, model_cr, model_rl, model_rlc]
 
-    modelFINAL = [modelC]
+    # iii Cross-subject study
+    modelC_cross_subj_dict = deepcopy(modelC_dict)  # just like C
+    modelC_cross_subj_dict["name"] = "modelC_CS"
+    modelC_cross_subj = Model(**modelC_cross_subj_dict)
+    modelsFINAL = [modelC_cross_subj]
+
+    # iv Downsampling
+    modelC_16_dict = deepcopy(modelC_dict)  # just like C
+    modelC_8_dict = deepcopy(modelC_dict)  # just like C
+    modelC_16_dict["architecture"] = Downsampled16
+    modelC_8_dict["architecture"] = Downsampled8
+    modelC_16_dict["name"] = "modelC_16"
+    modelC_8_dict["name"] = "modelC_8"
+    modelC_16 = Model(**modelC_16_dict)
+    modelC_8 = Model(**modelC_8_dict)
+    modelsDOWNSAMPLE = [modelC_16, modelC_8]
+
+
 
     # 2. Ablations
     ablation1 = Ablation(name="Frame", protocol=PROTOCOL_FIXED,
@@ -285,15 +313,18 @@ def configure_experiments(dataset_path : str):
     ablation2 = Ablation(name="View", protocol=PROTOCOL_FIXED,
                          description="View ablation", models=modelsVIEWS)
     ablation3 = Ablation(name="Final", protocol=PROTOCOL_CROSS_SUBJ,
-                         description="Final results on cross-subject", models=modelFINAL)
+                         description="Final results on cross-subject", models=modelsFINAL)
+    ablationD = Ablation(name="Downsampling", protocol=PROTOCOL_FIXED,
+                         description="Input resolution study", models=modelsDOWNSAMPLE)
+
 
     # 3. Experiment setup
-    ablations = [ablation1, ablation2, ablation3]
-    # DEBUG
+    ablations = [ablation1, ablation2, ablation3, ablationD]
+    modelA.epochs = 5
+    modelA.train_set_ratio = 1.0
+    modelA.loss_function = "early_exponential_loss"
     ablations = [Ablation(name="Frame", protocol=PROTOCOL_FIXED,
-                         description="Frame and frame_shift ablation", models=[modelC])]
-    ablations = [ablation1, ablation3]
-    ablations = [ablation1, ablation2, ablation3]
+                         description="Frame and frame_shift ablation", models=[modelA])]
     experiment_setup = Experiment_Setup(ablations=ablations, dataset_path=dataset_path)
 
     # 4. Return
@@ -302,5 +333,5 @@ def configure_experiments(dataset_path : str):
 
 if __name__ == "__main__":
     dataset_path = "/media/igor/DATA/D01_MFIR-AP-Dataset"
-    result = configure_experiments()
+    result = configure_experiments(dataset_path)
     result.print_summary()
