@@ -246,7 +246,7 @@ class Baseline1(Models_Training):
             TPA_merged = [*o_TPAs]
 
         rnn = RNN(TPA_dense_units*len(io_TPAs), activation='tanh',
-                  recurrent_activation='sigmoid', return_sequences=True, name="TPA_GRU")(TPA_merged)
+                  recurrent_activation='sigmoid', return_sequences=True, name="TPA_GRU", recurrent_dropout=0.5)(TPA_merged)
         TPA_dense = TimeDistributed(
             Dense(project.N_CLASSES, activation=None), name="TPA_dense")(rnn)
         TPA_classification = Activation(

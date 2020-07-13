@@ -6,7 +6,7 @@ import random
 import MFIRAP.d00_utils.project as project
 from tensorflow.keras import backend as K
 
-POS_LOSS_WEIGHT = 1.3
+POS_LOSS_WEIGHT = 0.5
 
 class Losses_Keras:
     def __init__(self, frames, frame_shift):
@@ -56,7 +56,7 @@ class Losses_Keras:
 
 
     def get_early_exponential_loss(self, from_logits=False):
-        E = 1 - np.exp(np.arange(self.frames)/(self.frames))
+        E = -(1 - np.exp(np.arange(self.frames)/(self.frames)))
         L = np.log(np.zeros(self.frames)+0.01)
         weight = (L*E).sum()/L.sum()
 
