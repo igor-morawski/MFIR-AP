@@ -41,11 +41,11 @@ def _build_TPA_embedding(view_id, dense_units, block1 = None):
             3, 3), padding="same", activation="relu"), name='TPA{}_b1c2'.format(view_id))(b1c1)
         b1c3 = TimeDistributed(Conv2D(filters=64, kernel_size=(
             3, 3), padding="same", activation="relu"), name='TPA{}_b1c3'.format(view_id))(b1c2)
+        # block2
+        b2m1 = TimeDistributed(MaxPool2D(pool_size=(2, 2), strides=(
+            2, 2)), name='TPA{}_b2m1'.format(view_id))(b1c3)
     else:
-        b1c3 = block1(embedding_input)
-    # block2
-    b2m1 = TimeDistributed(MaxPool2D(pool_size=(2, 2), strides=(
-        2, 2)), name='TPA{}_b2m1'.format(view_id))(b1c3)
+        b2m1 = block1(embedding_input)
     b2c1 = TimeDistributed(Conv2D(filters=128, kernel_size=(
         3, 3), padding="same", activation="relu"), name='TPA{}_b2c1'.format(view_id))(b2m1)
     b2c2 = TimeDistributed(Conv2D(filters=128, kernel_size=(

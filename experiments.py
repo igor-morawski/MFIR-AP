@@ -236,10 +236,10 @@ def configure_experiments(dataset_path : str):
     # 1A Model templates
     template_default_training_parameters = deepcopy(models_args_dict)
     template_default_training_parameters["batch_size"] = 16
-    template_default_training_parameters["epochs"] = 5
+    template_default_training_parameters["epochs"] = 10
     template_default_training_parameters["train_set_ratio"] = 1.0
     template_default_training_parameters["architecture"] = Baseline1
-    template_default_training_parameters["loss_function"] = "early_exponential_loss"
+    template_default_training_parameters["loss_function"] = "exponential_loss"
 
     template_frame_abl = deepcopy(template_default_training_parameters)
     template_frame_abl["view_IDs"] = ["121", "122", "123"]
@@ -291,6 +291,7 @@ def configure_experiments(dataset_path : str):
     # iii Cross-subject study
     modelC_cross_subj_dict = deepcopy(modelC_dict)  # just like C
     modelC_cross_subj_dict["name"] = "modelC_CS"
+    modelC_cross_subj_dict["epochs"] = 20
     modelC_cross_subj = Model(**modelC_cross_subj_dict)
     modelsFINAL = [modelC_cross_subj]
 
@@ -307,8 +308,8 @@ def configure_experiments(dataset_path : str):
 
     # losses
     modelC_normal_dict = deepcopy(modelC_dict)  # just like C
-    modelC_normal_dict["name"] = "modelC_exp_loss"
-    modelC_normal_dict["loss_function"] = "exponential_loss"
+    modelC_normal_dict["name"] = "modelC_early_exp_loss"
+    modelC_normal_dict["loss_function"] = "early_exponential_loss"
     modelC_early = modelC  # alias for C
     modelC_normal = Model(**modelC_normal_dict)
     models_losses = [modelC_early, modelC_normal]
@@ -321,7 +322,7 @@ def configure_experiments(dataset_path : str):
                          description="Frame and frame_shift ablation", models=modelsABCD)
     ablation2 = Ablation(name="View", protocol=PROTOCOL_FIXED,
                          description="View ablation", models=modelsVIEWS)
-    ablation3 = Ablation(name="Final", protocol=PROTOCOL_CROSS_SUBJ,
+    ablationCS = Ablation(name="Final", protocol=PROTOCOL_CROSS_SUBJ,
                          description="Final results on cross-subject", models=modelsFINAL)
     ablationD = Ablation(name="Downsampling", protocol=PROTOCOL_FIXED,
                          description="Input resolution study", models=modelsDOWNSAMPLE)
@@ -330,9 +331,7 @@ def configure_experiments(dataset_path : str):
 
 
     # 3. Experiment setup
-    ablations = [ablation1, ablation2, ablation3, ablationD, ablationL]
-    ablations = [Ablation(name="Frame", protocol=PROTOCOL_FIXED,
-                         description="Frame and frame_shift ablation", models=[modelA])]
+    ablations = [ablation1, ablation2, ablationD, ablationL, ablationCS]
     experiment_setup = Experiment_Setup(ablations=ablations, dataset_path=dataset_path)
 
     # 4. Return

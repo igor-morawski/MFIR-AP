@@ -191,7 +191,7 @@ def combine(experiment_setup_obj):
         set_lims()
         draw_iden_line()
         fp = os.path.join(
-            plots_dir, "prediction_roc{}.png".format(ablation.name))
+            plots_dir, "prediction_roc{}.svg".format(ablation.name))
         plt.savefig(fp, bbox_inches='tight')
         plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
         plt.close()
@@ -200,7 +200,7 @@ def combine(experiment_setup_obj):
         for model in models:
             d = det_rocs[(model.dict()["name"], protocol)]
             fpr, tpr = d['fpr'], d['tpr']
-            plt.plot(fpr, tpr, label=model.name+", AUC = {:.2f}".format(models_data_dict[(
+            plt.plot(fpr, tpr, label=model.name+", AUC = {:.4f}".format(models_data_dict[(
                 model.dict()["name"], protocol)]["metrics_dict"]["detection_auc"]), **plot_args)
             plt.xlabel('False positive rate')
             plt.ylabel('True positive rate')
@@ -208,7 +208,7 @@ def combine(experiment_setup_obj):
             set_lims()
             draw_iden_line()
             fp = os.path.join(
-                plots_dir, "detection_roc{}.png".format(ablation.name))
+                plots_dir, "detection_roc{}.svg".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
@@ -224,7 +224,7 @@ def combine(experiment_setup_obj):
             plt.legend(**loc_args)
             set_lims()
             draw_hline()
-            fp = os.path.join(plots_dir, "prediction_prc{}.png".format(
+            fp = os.path.join(plots_dir, "prediction_prc{}.svg".format(
                 "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
@@ -241,7 +241,7 @@ def combine(experiment_setup_obj):
             plt.legend(**loc_args)
             set_lims()
             draw_hline()
-            fp = os.path.join(plots_dir, "detection_prc{}.png".format(
+            fp = os.path.join(plots_dir, "detection_prc{}.svg".format(
                 "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
@@ -257,7 +257,7 @@ def combine(experiment_setup_obj):
             plt.xlabel('Recall')
             plt.ylabel('APT')
             plt.legend(**loc_args)
-            fp = os.path.join(plots_dir, "apt_recall_curve{}.png".format(
+            fp = os.path.join(plots_dir, "apt_recall_curve{}.svg".format(
                 "(ablation {})".format(ablation.name)))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
@@ -274,14 +274,14 @@ def combine(experiment_setup_obj):
             plt.ylabel('ADT')
             plt.legend(**loc_args)
             fp = os.path.join(
-                plots_dir, "adt_recall_curve{}.png".format(ablation.name))
+                plots_dir, "adt_recall_curve{}.svg".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
 
             # APT-Precision
             plt.title(
-                'APT-recall curve - prediction {}'.format("(ablation {})".format(ablation.name)))
+                'APT-precision curve - prediction {}'.format("(ablation {})".format(ablation.name)))
             for model in models:
                 d = aptpc[(model.dict()["name"], protocol)]
                 apt, precision = d['apt'], d['precision']
@@ -290,7 +290,7 @@ def combine(experiment_setup_obj):
             plt.ylabel('APT')
             plt.legend(**loc_args)
             fp = os.path.join(
-                plots_dir, "apt_precision_curve{}.png".format(ablation.name))
+                plots_dir, "apt_precision_curve{}.svg".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
@@ -306,7 +306,7 @@ def combine(experiment_setup_obj):
             plt.ylabel('ADT')
             plt.legend(**loc_args)
             fp = os.path.join(
-                plots_dir, "adt_precision_curve{}.png".format(ablation.name))
+                plots_dir, "adt_precision_curve{}.svg".format(ablation.name))
             plt.savefig(fp, bbox_inches='tight')
             plots_fps.append(os.path.relpath(fp, project.DATA_REPORTING_PATH))
             plt.close()
@@ -331,7 +331,7 @@ def combine(experiment_setup_obj):
     row_pattern = "<tr>{}</tr>"
     cell_pattern = '<td width="{w}%">{brackets}</td>'.format(
         w=100//len(sortable_header_keys), brackets="{}")
-    metric_cell_pattern = cell_pattern.format("{:.3f}")
+    metric_cell_pattern = cell_pattern.format("{:.4f}")
     header_cell_pattern = "<th>{}</th>"
 
     def cell_formatter(v):

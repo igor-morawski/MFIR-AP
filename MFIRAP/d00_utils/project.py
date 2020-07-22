@@ -24,6 +24,7 @@ DATA_PROCESSED_PATH = os.path.join(DATA_PATH, "03_processed")
 DATA_MODELS_PATH = os.path.join(DATA_PATH, "04_models")
 DATA_MODELS_OUTPUT_PATH = os.path.join(DATA_PATH, "05_model_output")
 DATA_REPORTING_PATH = os.path.join("data", "06_reporting")
+DATA_VISUALIZATION_PATH = os.path.join("data", "07_visualization")
 
 MEAN_STD_JSON = os.path.join(DATA_MODELS_PATH, "normalization.json")
 

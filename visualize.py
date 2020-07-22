@@ -1,91 +1,70 @@
-import matplotlib.pyplot as plt
 import pickle
-import MFIRAP.d01_data.tpa_tools as tpa_tools
-from MFIRAP.d04_modelling.models import SETUP_DIC, SETUP_RGB_FLAGS, RGB_FEATURES_LAYER_NAME
-from MFIRAP.d00_utils.project import MODEL_CONFIG_KEYS, TRAIN_LOG_FP
-from MFIRAP.d04_modelling.models import Model_Evaluation, RNN
-import argparse
-import tensorflow as tf
+import json
 import numpy as np
+import HTPA32x32d
 import glob
 import os
 import datetime
-import MFIRAP
-import MFIRAP.d00_utils.io as io
-import MFIRAP.d00_utils.dataset as ds
-import MFIRAP.d00_utils.verbosity as vb
-import MFIRAP.d00_utils.project as project
-from MFIRAP.d00_utils.paths import ensure_parent_exists
-import MFIRAP.d05_model_evaluation.plots as plots
-vb.VERBOSITY = vb.SPECIFIC
 import shutil
-
 import imageio
 import cv2
 import glob
+import argparse
 
+import MFIRAP.d00_utils.project as project
+
+import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
+from experiments import TESTING_SUBJ_L as SUBJECTS
+
+VIEW_IDs = ["121", "122", "123"]
 DPI = 100
 
-pos10 = ["20200605_1418_", "20200605_1510_", "20200605_1503_"]
-neg10 = ["20200605_1523_", "20200605_1516_", "20200605_1511_"]
-pos11 = ["20200602_1559_", "20200602_1503_", "20200602_1505_"]
-neg11 = ["20200602_1600_", "20200602_1606_", "20200602_1611_"]
-pos12 = ["20200605_1618_", "20200605_1701_", "20200605_1552_"]
-neg12 = ["20200605_1616_", "20200605_1545_", "20200605_1643_"]
-pos = pos10+pos11+pos12
-neg = neg10+neg11+neg12
-prefixes2visualize = list(set(pos + neg))
+FOURCC = cv2.VideoWriter_fourcc(*'mp4v')
+FPS = 30
 
-def read_gif_data(fp):
-    reader = imageio.get_reader(fp)
-    frames, durations = [], []
-    for i, frame in enumerate(reader):
-        frames.append(cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR))
-        durations.append(reader.get_meta_data()['duration']/1000)
-    return np.array(frames), durations
+
+def get_all_fps(dataset_path, subjects):
+    result = []
+    fps = []
+    for subject in subjects:
+        for c in [0, 1]:
+            fps.extend(glob.glob(os.path.join(
+                dataset_path, subject, str(c), "*ID*.TXT")))
+            fps.extend(glob.glob(os.path.join(
+                dataset_path, subject, str(c), "*IDRGB")))
+    result = fps.copy()
+    return result
+
 
 def get_prefix(fp):
     fn = os.path.split(fp)[-1]
     return fn.split("ID")[0]
 
 if __name__ == "__main__":
-    ###
     parser = argparse.ArgumentParser()
-    parser.add_argument('config_json_name', type=str)
+    parser.add_argument('model_hdf5_fp', type=str)
+    parser.add_argument('--dataset_path', dest="dataset_path", default="/media/igor/DATA/D01_MFIR-AP-Dataset", type=str)
     args = parser.parse_args()
 
-    config_json_name = args.config_json_name.split(".json")[0]
-    model_config = io.read_json(os.path.join(
-        "settings", config_json_name+".json"))
-    for key in MODEL_CONFIG_KEYS:
-        try:
-            model_config[key]
-        except KeyError:
-            raise Exception(
-                "Key {} not found in model configuration.".format(key))
-    try:
-        Setup = SETUP_DIC[model_config["setup"]]
-    except KeyError:
-        raise ValueError("Specified setup {} doesn't exist. Implemented setups: {}".format(
-            model_config["setup"], SETUP_DIC))
+    if not os.path.exists(args.model_hdf5_fp):
+        raise Exception
 
-    reporting_dir = os.path.join("data", "06_reporting", config_json_name)
-    reporting_img_dir = os.path.join(reporting_dir, "img")
-    html_path = os.path.join(reporting_dir, "report.html")
-    save_path = os.path.join(reporting_dir, config_json_name+".pkl")
-    if os.path.exists(save_path):
-        os.remove(save_path)
-    if os.path.exists(html_path):
-        os.remove(html_path)
-    ensure_parent_exists(html_path)
-    ensure_parent_exists(os.path.join(reporting_img_dir, "dummy.ext"))
-    name = config_json_name
-    data_models_model_path = os.path.join(project.DATA_MODELS_PATH, name)
-    data_models_output_model_path = os.path.join(
-        project.DATA_MODELS_OUTPUT_PATH, name)
-    with open(os.path.join(data_models_model_path, "testing_results.pkl"), "rb") as f:
+    head, tail = os.path.split(args.model_hdf5_fp)
+    name = tail.split(".")[0]
+    testing_results_pkl = os.path.join(head, "testing_results_"+name+".pkl")
+    data_models_visualize_dir = os.path.join(project.DATA_VISUALIZATION_PATH, name)
+    if not os.path.exists(data_models_visualize_dir):
+        os.mkdir(data_models_visualize_dir)
+    if not os.path.exists(testing_results_pkl):
+        raise Exception
+
+    c_dir = ["fp", "fn", "tp", "tn"]
+    [os.mkdir(os.path.join(data_models_visualize_dir, c)) if not os.path.exists(os.path.join(data_models_visualize_dir, c)) else 0 for c in c_dir]
+
+
+    with open(testing_results_pkl, "rb") as f:
         testing_results_dict = pickle.load(f)
     # prefixesprefixes = testing_results_dict["prefixes"] 
     sample_classes_dict = testing_results_dict["sample_classes_dict"] 
@@ -93,26 +72,88 @@ if __name__ == "__main__":
     predictions_dict = testing_results_dict["predictions_dict"]  
     timestamps_dict = testing_results_dict["timestamps_dict"]  
     optimal_threshold = testing_results_dict["optimal_threshold"] 
-    data_models_visualize_dir = project.DATA_VISUALIZATION_PATH
 
-    output_dir = os.path.join(data_models_visualize_dir, name)
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    # delete previous gifs
-    pattern = os.path.join(output_dir, "*.gif")
-    gifs2delete = glob.glob(pattern)
-    if gifs2delete:
-        for fp in gifs2delete:
-            os.remove(fp)
-    gifs_src_path = ds.read_gifs_path()
+    all_fps = get_all_fps(args.dataset_path, subjects=SUBJECTS)
+    all_prefixes = list(set([fp.split("ID")[-2] for fp in all_fps]))
+    tp_prefixes, fp_prefixes, tn_prefixes, fn_prefixes = [], [], [], []
+    for prefix in all_prefixes:
+        sample_class = sample_classes_dict[prefix]
+        label = labels_dict[prefix]
+        pred = predictions_dict[prefix]
+        timestamps = timestamps_dict[prefix]
+        thresh = pred > optimal_threshold
+        if sample_class:
+            # TP
+            if any(thresh):
+                tte = timestamps[label]-timestamps
+                TTA = (tte * thresh).max()
+                if TTA > 0:
+                    tp_prefixes.append(prefix)
+                else:
+                    fn_prefixes.append(prefix)
+            # FN
+            else:
+                fn_prefixes.append(prefix)
+        # if N
+        if not sample_class:
+            # TN
+            if not any(thresh):
+                tn_prefixes.append(prefix)
+            # FP
+            else:
+                fp_prefixes.append(prefix)
 
-    ############ MAIN LOOP
-    for prefix in prefixes2visualize:
-        matches = glob.glob(os.path.join(gifs_src_path,"*",prefix+"*.gif"))
-        fp = matches[0]
-        array, durations = read_gif_data(fp)
-        T, height, width, ch = array.shape 
-        key_correspondence = [key if prefix in get_prefix(key) else False for key in predictions_dict.keys()]
+    for prefix in None:
+        cat = None
+        if prefix in tn_prefixes: 
+            cat = "tn"  
+        if prefix in fp_prefixes:
+            cat = "fp" 
+        if prefix in tp_prefixes:
+            cat = "tp" 
+        if prefix in fn_prefixes:
+            cat = "fn" 
+        assert cat
+        video_fp = os.path.join(data_models_visualize_dir, cat, os.path.split(prefix)[-1]+".mp4")
+        print(video_fp)
+        if os.path.exists(video_fp):
+            continue
+        tpa_fps = [prefix+"ID{}.TXT".format(id) for id in VIEW_IDs]
+        rgb_dir = prefix+"IDRGB"
+        _s = HTPA32x32d.dataset.TPA_RGB_Sample_from_filepaths(tpa_fps, rgb_dir)
+        arrays, timestamps = _s.TPA.arrays, _s.TPA.timestamps
+        rgb_fps, rgb_ts = _s.RGB.filepaths, _s.RGB.timestamps
+        img_sequence = [cv2.imread(fp) for fp in rgb_fps]
+        rgb_sequence = np.array(img_sequence).astype(np.uint8)
+        v_idx = [_s.TPA.ids.copy().index(v) for v in ["123", "121", "122"]]
+        data = np.concatenate([_s.TPA.arrays[i] for i in v_idx], axis=2)
+        pc = HTPA32x32d.tools.np2pc(data)
+        rgb_height, rgb_width = (cv2.imread(_s.RGB.filepaths[0]).shape)[0:2]
+        # 
+        pc = np.insert(pc, range(pc.shape[2]//len(_s.TPA.arrays), pc.shape[2], pc.shape[2]//len(_s.TPA.arrays)), 0, axis=2)
+        old_h, old_w = pc.shape[1:3]
+        new_width = int((rgb_width/old_w)*old_w)
+        new_height = int((rgb_width/old_w)*old_h)
+        #
+        pc_reshaped = [cv2.resize(frame, dsize=(
+            new_width, new_height), interpolation=cv2.INTER_NEAREST) for frame in pc]
+        pc_reshaped = np.array(pc_reshaped).astype(np.uint8)
+        margin_size = rgb_width-new_width
+        pc_frames, pc_height, pc_width, pc_ch = pc_reshaped.shape
+        pc = np.concatenate([pc_reshaped, np.zeros(
+            [pc_frames, pc_height, margin_size, pc_ch], dtype=np.uint8)], axis=2)
+        img_sequence = [cv2.imread(fp) for fp in _s.RGB.filepaths]
+        rgb_sequence = np.array(img_sequence).astype(np.uint8)
+        vis = np.concatenate([pc, rgb_sequence], axis=1)
+        ts = np.sum(_s._TPA_RGB_timestamps, axis=0) / \
+            len(_s._TPA_RGB_timestamps)
+        durations = HTPA32x32d.tools.timestamps2frame_durations(ts)
+        
+        del(_s)
+        T, height, width, ch = vis.shape 
+        array = vis
+
+        key_correspondence = [key if os.path.split(prefix)[-1] in get_prefix(key) else False for key in predictions_dict.keys()]
         assert any(key_correspondence)
         dict_key = None
         for k in key_correspondence:
@@ -121,13 +162,15 @@ if __name__ == "__main__":
         assert dict_key
         predictions = predictions_dict[dict_key]
         timestamps = timestamps_dict[dict_key]
-        assert len(array) == len(durations) == len(predictions)
+        assert len(vis) == len(durations) == len(predictions)
+
         plots = []
         plt.close()
         plt.rcParams["figure.dpi"] = DPI 
         figure_width_inches = width/DPI
         figure_height_inches = figure_width_inches*3/4
         fig = plt.figure(num=0, figsize=[figure_width_inches, figure_height_inches], dpi=DPI)
+
         plt.rcParams["figure.figsize"] = [figure_width_inches, figure_height_inches]
         plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
         plt.title("Predicted probability of the action in the near future")
@@ -172,6 +215,10 @@ if __name__ == "__main__":
         th_ex = (predictions >= optimal_threshold)
         T_alarm = timestamps[np.where(th_ex)].min() if np.any(th_ex) else np.NaN 
         # handle cases by looking at np.NaN
+        frame_size = (video.shape[2], video.shape[1])
+        out = cv2.VideoWriter(video_fp, FOURCC, FPS, frame_size)
+        timer = 0
+        duration = 0
         for idx, f in enumerate(video):
             #A
             if predictions[idx] >= optimal_threshold:
@@ -194,30 +241,61 @@ if __name__ == "__main__":
                 cv2.putText(f, text=text2, org=(700, 90), **tt_alarm_dict)
             if not np.isnan(diff):
                 cv2.putText(f, text=text3, org=(700, 135), **tt_alarm_dict)
+            f[H-gh:H, 0:gw, :] = array[idx, 0:gh, 0:gw, ::-1]
+            f[H-ph:H, gw:, :] = plots[idx, 0:ph, 0:pw, :]
+            while True:
+                out.write(f[:, :, ::-1])
+                timer = timer+1/FPS
+                duration = duration+durations[idx] 
+                if (duration > timer):
+                    break
+        out.release()
 
-        ###########
-        segment_size = 200
-        segments = [(i*segment_size, (i+1)*segment_size if (i+1)*segment_size<=T else T) for i in range(int(np.ceil(T/segment_size)))]
-        for segment in segments:
-            start, stop = segment
-            video[start:stop, H-gh:H, 0:gw, :] = array[start:stop, 0:gh, 0:gw, :]
-            video[start:stop, H-ph:H, gw:, :] = plots[start:stop, 0:ph, 0:pw, :]
-        with imageio.get_writer(os.path.join(output_dir, prefix+"_PLOT_VIZ.gif"), mode='I', duration=durations, loop=True) as writer:
-            for image in video:
-                writer.append_data(image)
-        writer.close()
-        video = None
-        plots = None
-        array = None
-    try:
-        shutil.copy2(os.path.join(project.DATA_VISUALIZATION_PATH, "gif2mp4.sh"), os.path.join(output_dir, "gif2mp4.sh"))      
-        pattern = os.path.join(output_dir, "*.mp4")
-        vids2delete = glob.glob(pattern)
-        if vids2delete:
-            for fp in vids2delete:
-                os.remove(fp)
-        os.system("cd {}; bash gif2mp4.sh".format(output_dir))
-    except FileNotFoundError:
-        pass
 
-    
+'''
+        """
+        Writes visualization gif to same directory as in self.filepaths,
+        the filename follows the template: FILE_PREFIX_ID{id1}-{id2}-...-{idn}.gif
+
+        vis_order - preferred order, 
+        """
+        if not self.test_alignment():
+            raise Exception("Unaligned sequences cannot be synchronized!")
+        if vis_order:
+            try:
+                assert len(vis_order) == len(self.TPA.ids)
+                assert set(vis_order) == set(self.TPA.ids)
+                v_idx = [self.TPA.ids.copy().index(v) for v in vis_order]
+            except:
+                print("[WARNING] Visualization order ignored")
+                v_idx = list(range(len(self.TPA.ids)))
+        else:
+            v_idx = list(range(len(self.TPA.ids)))
+        data = np.concatenate([self.TPA.arrays[i] for i in v_idx], axis=2)
+        pc = HTPA32x32d.tools.np2pc(data)
+        rgb_height, rgb_width = (cv2.imread(self.RGB.filepaths[0]).shape)[0:2]
+        # 
+        pc = np.insert(pc, range(pc.shape[2]//len(self.TPA.arrays), pc.shape[2], pc.shape[2]//len(self.TPA.arrays)), 0, axis=2)
+        old_h, old_w = pc.shape[1:3]
+        new_width = int((rgb_width/old_w)*old_w)
+        new_height = int((rgb_width/old_w)*old_h)
+        #
+        pc_reshaped = [cv2.resize(frame, dsize=(
+            new_width, new_height), interpolation=cv2.INTER_NEAREST) for frame in pc]
+        pc_reshaped = np.array(pc_reshaped).astype(np.uint8)
+        margin_size = rgb_width-new_width
+        pc_frames, pc_height, pc_width, pc_ch = pc_reshaped.shape
+        pc = np.concatenate([pc_reshaped, np.zeros(
+            [pc_frames, pc_height, margin_size, pc_ch], dtype=np.uint8)], axis=2)
+        img_sequence = [cv2.imread(fp) for fp in self.RGB.filepaths]
+        rgb_sequence = np.array(img_sequence).astype(np.uint8)
+        vis = np.concatenate([pc, rgb_sequence], axis=1)
+        ts = np.sum(self._TPA_RGB_timestamps, axis=0) / \
+            len(self._TPA_RGB_timestamps)
+        duration = HTPA32x32d.tools.timestamps2frame_durations(ts)
+        head, tail = os.path.split(self.TPA.filepaths[0])
+        fn = _TPA_get_file_prefix(tail) + "ID" + \
+            "-".join(self.TPA.ids) + "-RGB" + ".gif"
+        fp = os.path.join(head, fn)
+        HTPA32x32d.tools.write_pc2gif(vis, fp, duration=duration)
+'''
