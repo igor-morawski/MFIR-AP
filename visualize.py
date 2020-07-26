@@ -13,6 +13,8 @@ import argparse
 
 import MFIRAP.d00_utils.project as project
 
+EPSILON = 1e-7
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 
@@ -72,8 +74,9 @@ if __name__ == "__main__":
     predictions_dict = testing_results_dict["predictions_dict"]  
     timestamps_dict = testing_results_dict["timestamps_dict"]  
     optimal_threshold = testing_results_dict["optimal_threshold"] 
-
-    all_fps = get_all_fps(args.dataset_path, subjects=SUBJECTS)
+	
+    subjects = SUBJECTS if "_CS" not in tail else ["subject{}".format(tail.split("CS_")[-1].split(".")[0])]
+    all_fps = get_all_fps(args.dataset_path, subjects=subjects)
     all_prefixes = list(set([fp.split("ID")[-2] for fp in all_fps]))
     tp_prefixes, fp_prefixes, tn_prefixes, fn_prefixes = [], [], [], []
     for prefix in all_prefixes:
@@ -103,7 +106,7 @@ if __name__ == "__main__":
             else:
                 fp_prefixes.append(prefix)
 
-    for prefix in None:
+    for prefix in fn_prefixes[:5]:
         cat = None
         if prefix in tn_prefixes: 
             cat = "tn"  
@@ -247,6 +250,8 @@ if __name__ == "__main__":
                 out.write(f[:, :, ::-1])
                 timer = timer+1/FPS
                 duration = duration+durations[idx] 
+                if durations[idx] == 0:
+                    duration = duration + 1/FPS + EPSILON
                 if (duration > timer):
                     break
         out.release()

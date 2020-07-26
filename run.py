@@ -494,6 +494,7 @@ def get_model_metrics(testing_results_dict):
     DTP, DTN, DFP, DFN, TTA_sum = 0, 0, 0, 0, 0
     # calculate
     assert len(prefixes)
+    tps, tns, fps, fns = [], [], [], []
     for prefix in prefixes:
         sample_class = sample_classes_dict[prefix]
         label = labels_dict[prefix]
@@ -516,14 +517,17 @@ def get_model_metrics(testing_results_dict):
                 # if TTA positive count as TP because the model PREDICTED the action [before its onset]
                 if TTA > 0:
                     TP += 1
+                    tps.append(prefix)
                     PT_sum += TTA
                 # if TTA negative count as FN! because the model FAILED to PREDICT the action
                 else:
                     FN += 1
+                    fns.append(prefix)
             # FN
             else:
                 DFN += 1
                 FN += 1
+                fns.append(prefix)
                 # FN will not contribute in any way to ATTA
         # if N
         if not sample_class:
@@ -531,10 +535,12 @@ def get_model_metrics(testing_results_dict):
             if not any(thresh):
                 DTN += 1
                 TN += 1
+                tns.append(prefix)
             # FP
             else:
                 DFP += 1
                 FP += 1
+                fps.append(prefix)
 
     assert(TP + TN + FP + FN == len(prefixes))
     assert(DTP + DTN + DFP + DFN == len(prefixes))
@@ -606,9 +612,13 @@ def get_model_metrics(testing_results_dict):
     min_avg_t, max_avg_t = plots.compute_max_min_average_time_bounds(
         labels_dict, timestamps_dict)
     plots_dict['min_avg_t'], plots_dict['max_avg_t'] = min_avg_t, max_avg_t
-
+    tps
     data_dict = {"name": testing_results_dict["name"],
-                 "metrics_dict": metrics_dict, "plots_dict": plots_dict, "testing_results_dict": testing_results_dict}
+                 "metrics_dict": metrics_dict, "plots_dict": plots_dict, "testing_results_dict": testing_results_dict, 
+                 "tps" : tps,
+                 "fps" : fps, 
+                 "tns" : tns, 
+                 "fns" : fns}
     return data_dict
 
 
@@ -658,6 +668,20 @@ def combine_all_metrics(all_metrics_dict_list):
     result["testing_results_dict"]["prefixes"] = []
     [result["testing_results_dict"]["prefixes"].extend(
         data_dict["testing_results_dict"]["prefixes"]) for data_dict in all_metrics_dict_list]
+
+    result["tps"] = []
+    result["fps"] = []
+    result["tns"] = []
+    result["fns"] = []
+    [result["tps"].extend(
+        data_dict["tps"]) for data_dict in all_metrics_dict_list]
+    [result["fps"].extend(
+        data_dict["fps"]) for data_dict in all_metrics_dict_list]
+    [result["tns"].extend(
+        data_dict["tns"]) for data_dict in all_metrics_dict_list]
+    [result["fns"].extend(
+        data_dict["fns"]) for data_dict in all_metrics_dict_list]
+
     result["name"] = name
     return result
 
@@ -826,8 +850,13 @@ def generate_report_html_data(data_dict, model_dict):
     </table>
     '''.format(**metrics_dict)
 
+
+    quals_headers = ["fps", "fns", "tps", "tns"]
+    quals_prefixes = ["".join(["<li>{}</li>".format(prefix) for prefix in data_dict[k]]) for k in quals_headers]
+    qual_list = "".join("<ul><li>{}</li><ul>{}</ul></ul>".format(h, p) for h, p in zip(quals_headers, quals_prefixes))
+
     dt = datetime.datetime.now()
-    report_data = {"summary": summary, "date": dt.date(), "time": dt.time(), "optimal_threshold": optimal_threshold,
+    report_data = {"summary": summary, "date": dt.date(), "time": dt.time(), "optimal_threshold": optimal_threshold, "qual_list": qual_list,
                    "cfs_table": cfs_table, "metrics_table": metrics_table, "samples_n": len(prefixes), "pos_n": DTP+DFN, "neg_n": DTN + DFP}
 
     report_html = '''
@@ -889,6 +918,8 @@ def generate_report_html_data(data_dict, model_dict):
             {cfs_table}
             <h3>Metrics</h3>
             {metrics_table}
+            <h3>Qualitative analysis</h3>
+            {qual_list}
         </body>
     </html> 
     '''.format(**report_data, name=name)
