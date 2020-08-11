@@ -22,6 +22,7 @@ import MFIRAP.d05_model_evaluation.plots as plots
 
 from tensorflow.keras.backend import clear_session
 from tensorflow.keras.callbacks import ModelCheckpoint
+import tensorflow
 
 import experiments
 from experiments import PROTOCOL_FIXED, PROTOCOL_CROSS_SUBJ, PROTOCOL_DICT
@@ -1030,9 +1031,10 @@ def model_test(fold_name, model_dir, model_dict, dataset_path, testing_subj, mu,
             timestamps.append(ts)
         header = HTPA32x32d.tools.read_txt_header(
             prefix+"ID"+model_dict['view_IDs'][0]+".TXT")
+        label_name = model_dict["label_name"]
         for chunk in header.split(","):
-            if "label" in chunk:
-                label = int(chunk.split("label")[-1])
+            if label_name in chunk:
+                label = int(chunk.split(label_name)[-1])
         sample_class = 1 if (label > 0) else 0
         # stateless prediction
         # setup.model.reset_states()
@@ -1102,20 +1104,26 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
     3 losses OK
     5 metrics : IGNORE ATTA, callbacks OK, optimizer
     6 setup"""
+    valid_frames_before=200
+    valid_frames_after=0
+    valid_batch_size=8
     generators = TXT_Train_Validation_Generators(dataset_path=dataset_path, subject_list=development_subj, train_size=model_dict["train_set_ratio"], frames_before=model_dict[
-                                                 "frames"]-model_dict["frame_shift"], frames_after=model_dict["frame_shift"], view_IDs=model_dict["view_IDs"], batch_size=model_dict["batch_size"], mu=mu, sigma=sigma, shuffle=True)
+                                                 "frames"]-model_dict["frame_shift"], frames_after=model_dict["frame_shift"], view_IDs=model_dict["view_IDs"], batch_size=model_dict["batch_size"], mu=mu, sigma=sigma, label_name=model_dict["label_name"], shuffle=True,
+                                                 valid_frames_before=valid_frames_before, valid_frames_after=valid_frames_after, valid_batch_size=valid_batch_size)
     train_gen, valid_gen = generators.get_train(), generators.get_valid()
     losses = Losses_Keras(
         frames=model_dict['frames'], frame_shift=model_dict['frame_shift'])
     loss_fnc = losses.get_by_name(model_dict["loss_function"])
     ap_metrics = [AUC_AP(), Accuracy_AP(), Precision_AP(),
-                  Recall_AP(), PrecisionAtRecall_AP(0.8)]
+                  Recall_AP(), PrecisionAtRecall_AP(0.95)]
+    fp_hdf5 = os.path.join(model_dir, fold_name+".hdf5")
     fp_hdf5 = os.path.join(model_dir, fold_name+".hdf5")
     mcp = ModelCheckpoint(fp_hdf5, monitor='val_loss', verbose=True,
-                          save_best_only=False, save_weights_only=True)
+                          save_best_only=True, save_weights_only=True)
+    tbl = tensorflow.keras.callbacks.TensorBoard(os.path.join(model_dir, 'logs{}'.format(fold_name)))
     metrics = ap_metrics
-    callbacks = [mcp]
-    optimizer = "adam"
+    callbacks = [mcp, tbl]
+    optimizer = tensorflow.keras.optimizers.Adam(learning_rate=model_dict['learning_rate'])
     epochs = model_dict["epochs"]
     #### 1
     compile_kwargs = {"loss": loss_fnc,
@@ -1127,6 +1135,7 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
                   TPA_view_IDs=model_dict['view_IDs'])
     # setup.delete_existing_model_data_and_output()
     print(setup.model.summary())
+
     setup.train()
     setup.write_architecture()
     # setup.plot_metrics(plot_val_metrics=valid_gen)
@@ -1134,10 +1143,16 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
     #### 2
     # Get optimal threshold.
     print("Getting optimal threshold...")
+    # RELOAD
+    data_models_model_path = setup.data_models_model_path
+    setup = Model_Evaluation(data_models_model_path, fold_name=fold_name,
+                             stateful=False, weights_ext="hdf5", load_scaling=False)
+
     # https://support.sas.com/en/books/reference-books/analyzing-receiver-operating-characteristic-curves-with-sas/review.html
     # Gonen, Mithat. 2007. Analyzing Receiver Operating Characteristic Curves with SAS. Cary, NC: SAS Institute Inc.
     preds_list, trues_list = [], []
-    generators = [train_gen, valid_gen] if valid_gen else [train_gen]
+    # generators = [train_gen, valid_gen] if valid_gen else [train_gen]
+    generators = [valid_gen] if valid_gen else [train_gen]
     for generator in generators:
         for i in range(len(generator)):
             x, y = generator[i]
@@ -1152,6 +1167,8 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
         sample_class = true[-1][-1]
         labels_dict[idx] = model_dict["frames"] - \
             model_dict["frame_shift"] if sample_class else -1
+        if valid_gen:
+            labels_dict[idx] = valid_frames_before if sample_class else -1
     prc_pre_fpr, prc_pre_tpr, prc_pre_thresholds = plots.prediction_pr_curve(
         labels_dict, predictions_dict)
     # get optimal threshold
@@ -1161,7 +1178,7 @@ def model_train(fold_name, model_dir, model_dict, dataset_path, development_subj
     d = ideal-xy
     D = (d*d).sum(axis=-1)
     optimal_threshold = thresh[D.argmin()]
-    with open(os.path.join(setup.data_models_model_path, project.THRESHOLD_FILE_PATTERN.format(fold_name)), "wb") as f:
+    with open(os.path.join(data_models_model_path, project.THRESHOLD_FILE_PATTERN.format(fold_name)), "wb") as f:
         pickle.dump(optimal_threshold, f)
     #### /2
     print("Trained {}".format(model_dict["name"]))

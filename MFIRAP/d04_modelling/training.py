@@ -128,7 +128,7 @@ class Data_generator(tf.keras.utils.Sequence):
             random.shuffle(self.neg_samples)
 
 class TXT_Train_Validation_Generators(tf.keras.utils.Sequence):
-    def __init__(self, dataset_path, subject_list, train_size, frames_before, frames_after, view_IDs, batch_size, mu, sigma, shuffle=True):
+    def __init__(self, dataset_path, subject_list, train_size, frames_before, frames_after, view_IDs, batch_size, mu, sigma, label_name, shuffle=True, valid_frames_before=None, valid_frames_after=None, valid_batch_size=None):
         self.dataset_path = dataset_path
         self.subject_list = subject_list.copy()
         self.view_IDs = view_IDs.copy()
@@ -138,6 +138,18 @@ class TXT_Train_Validation_Generators(tf.keras.utils.Sequence):
         self.frames_after = frames_after
         self.mu = mu
         self.sigma = sigma
+        self.label_name = label_name
+
+        if not valid_frames_before:
+            valid_frames_before=frames_before
+        if not valid_frames_after:
+            valid_frames_after=frames_after
+        if not valid_batch_size:
+            valid_batch_size=batch_size
+        self.valid_frames_before = valid_frames_before
+        self.valid_frames_after = valid_frames_after
+        self.valid_batch_size = valid_batch_size
+
         if train_size > 1:
             train_size = 1
         if (train_size == -1):
@@ -167,13 +179,12 @@ class TXT_Train_Validation_Generators(tf.keras.utils.Sequence):
         self.valid_pos_samples, self.valid_neg_samples = pos_samples[split_pt:], neg_samples[split_pt:]
 
     def get_train(self):
-        return TXT_Data_generator(self.train_pos_samples, self.train_neg_samples, frames_before=self.frames_before, frames_after=self.frames_after, view_IDs = self.view_IDs, batch_size = self.batch_size, mu=self.mu, sigma=self.sigma, shuffle = self.shuffle)
-    
+        return TXT_Data_generator(self.train_pos_samples, self.train_neg_samples, frames_before=self.frames_before, frames_after=self.frames_after, view_IDs = self.view_IDs, batch_size = self.batch_size, mu=self.mu, sigma=self.sigma, label_name=self.label_name, shuffle = self.shuffle)    
     def get_valid(self):
-        return TXT_Data_generator(self.valid_pos_samples, self.valid_neg_samples, frames_before=self.frames_before, frames_after=self.frames_after, view_IDs = self.view_IDs, batch_size = self.batch_size, mu=self.mu, sigma=self.sigma, shuffle = self.shuffle)
+        return TXT_Data_generator(self.valid_pos_samples, self.valid_neg_samples, frames_before=self.valid_frames_before, frames_after=self.valid_frames_after, view_IDs = self.view_IDs, batch_size = self.valid_batch_size, mu=self.mu, sigma=self.sigma, label_name=self.label_name, shuffle = self.shuffle)
    
 class TXT_Data_generator(tf.keras.utils.Sequence):
-    def __init__(self, pos_samples, neg_samples, frames_before, frames_after, view_IDs, batch_size, mu, sigma, shuffle=True):
+    def __init__(self, pos_samples, neg_samples, frames_before, frames_after, view_IDs, batch_size, mu, sigma, label_name, shuffle=True):
         self.pos_samples = pos_samples.copy()
         self.neg_samples = neg_samples.copy()
         self.frames_before = frames_before
@@ -186,6 +197,7 @@ class TXT_Data_generator(tf.keras.utils.Sequence):
         self.neg_in_batch_n = self.pos_in_batch_n
         self.mu = mu
         self.sigma = sigma
+        self.label_name = label_name
 
     def __len__(self):
         m = len(self.pos_samples) if len(self.pos_samples) < len(self.neg_samples) else len(self.neg_samples)
@@ -201,8 +213,8 @@ class TXT_Data_generator(tf.keras.utils.Sequence):
         for idx in indices:
             samples = [self.pos_samples[idx], self.neg_samples[idx]]
             for prefix in samples:
-                label=_get_label(fp = prefix+"ID"+self.keys[0]+".TXT")
-                one_hot = project.DATASET_POSITIVE_ONE_HOT if _get_class(fp = prefix+"ID"+self.keys[0]+".TXT") else project.DATASET_NEGATIVE_ONE_HOT
+                label=_get_label(prefix+"ID"+self.keys[0]+".TXT", self.label_name)
+                one_hot = project.DATASET_POSITIVE_ONE_HOT if _get_class(prefix+"ID"+self.keys[0]+".TXT", self.label_name) else project.DATASET_NEGATIVE_ONE_HOT
                 random_n = random.uniform(0, 1)
                 for i, id in enumerate(self.keys):
                     fp = prefix+"ID"+id+".TXT"
@@ -242,17 +254,17 @@ class TXT_Data_generator(tf.keras.utils.Sequence):
 
 
         
-def _get_label(fp):
+def _get_label(fp, label_name):
     header = HTPA32x32d.tools.read_txt_header(fp)
     label = None
     for chunk in header.split(","):
-        if "label" in chunk:
-            label = int(chunk.split("label")[-1])
+        if label_name in chunk:
+            label = int(chunk.split(label_name)[-1])
     if not label:
         raise ValueError("No label in {}".format(fp))
     return label
     
-def _get_class(fp):
-    label = _get_label(fp)
+def _get_class(fp, label_name):
+    label = _get_label(fp, label_name)
     sample_class = 1 if (label > 0) else 0
     return sample_class
