@@ -234,7 +234,7 @@ def configure_experiments(dataset_path : str):
     Models >> Ablations >> Experiment Setup >> Setup Compilation
     """
 
-    label_name="feet"
+    label_name="label"
 
     models_args = inspect.getargspec(Model).args
     models_args_dict = dict.fromkeys(models_args)
