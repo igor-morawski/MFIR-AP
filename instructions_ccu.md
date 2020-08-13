@@ -128,6 +128,7 @@ ons (filenames, filepaths)
 * **MFIR-AP/MFIRAP/d01_data/make.py** run locally by run by python {python_file} {arguments} *DATASET LABELING FROM labels.json*
 
 # Instruction for collecting and processing data set
+You might consider alternating code (writing your own scripts) to label data.
 1. Collect data using recorder.py *HTPA32x32d/recording/recorder.py*
 2. Align data set (whole directory of samples at once) *MFIR-AP/MFIRAP/d01_data/align.py*
 e.g. 
@@ -135,6 +136,17 @@ python align.py filepath_header/dir_name
 it will result in aligned data directory
 filepath_header/dir_name+"_aligned"
 3. Fill in labels in labels.json in newly created aligned data directory
+   * Get file prefix from labels.json e.g. 20200807_1516_
+   * Navigate to 20200807_1516_IDRGB
+   * Find frame that you want to label e.g. 34-77.jpg
+   * Open timesteps.txt > ctrl + F > find 34-77.jpg, e.g.:
+  
+```270: /media/igor/DATA/PIPELINE/20200807s21_aligned/20200807_1516_IDRGB/34-77.jpg```
+
+   * In the label.json replace "" with 270 for this prefix.
+   * Repeat for all the files
+   * If you used ",neg" in your header when recording data, the sample will be automatically labeled with -1 label.
+
 4. Label data
 In this step the script will add a label to each TXT file header as:
 
@@ -147,4 +159,4 @@ python make.py filepath_header/dir_name+"_aligned"
 it will result in aligned data directory
 filepath_header/dir_name+"_labeled"
 
-5. (Optional) If you want to add additional label use MFIRAP/labeler.py This is actually really convinient, so you might consider alternating code (writing your own scripts) to label data
+5. (Optional) If you want to add additional label use MFIRAP/labeler.py This is actually really convinient, so you might consider alternating code (writing your own scripts) to label data.
